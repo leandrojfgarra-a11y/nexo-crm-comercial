@@ -1,0 +1,592 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Cores primárias e identidade Nexo */
+  --color-ink: #172334;
+  --color-muted: #718096;
+  --color-canvas: #f4f7fb;
+  --color-surface: #ffffff;
+  --color-navy: #10233f;
+  --color-navy-soft: #1a3558;
+  --color-blue: #2878d0;
+  --color-blue-hover: #1768bf;
+  --color-cyan: #20b9d2;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Cores semânticas de status */
+  --color-success: #15966a;
+  --color-success-light: #e8f5ee;
+  --color-warning: #e59a19;
+  --color-warning-light: #fdf3e0;
+  --color-danger: #dc4c64;
+  --color-danger-light: #fdecef;
+  --color-info: #2878d0;
+  --color-info-light: #eef5fd;
+
+  /* Espaçamentos, bordas e sombras */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --shadow-sm: 0 1px 2px 0 rgb(16 35 63 / 0.06);
+  --shadow-md: 0 4px 6px -1px rgb(16 35 63 / 0.08), 0 2px 4px -2px rgb(16 35 63 / 0.04);
+  --shadow-lg: 0 10px 15px -3px rgb(16 35 63 / 0.08), 0 4px 6px -4px rgb(16 35 63 / 0.04);
+  --shadow-xl: 0 20px 25px -5px rgb(16 35 63 / 0.1), 0 8px 10px -6px rgb(16 35 63 / 0.05);
+}
+
+:root {
+  color-scheme: light;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+* { box-sizing: border-box; }
+
+html { min-width: 320px; scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font: inherit; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled) { cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+
+::selection { background: #bcebf3; color: #10233f; }
+
+:focus-visible {
+  outline: 3px solid rgb(40 120 208 / 0.42);
+  outline-offset: 2px;
+}
+
+input, select, textarea { max-width: 100%; }
+textarea { resize: vertical; }
+img, svg, video { max-width: 100%; }
+
+/* ============================================================
+   Controles de formulário padronizados
+   ============================================================ */
+main input:not([type="checkbox"]):not([type="radio"]),
+main select,
+main textarea {
+  border: 1px solid #b8c8dc;
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+main input:not([type="checkbox"]):not([type="radio"]):hover,
+main select:hover,
+main textarea:hover {
+  border-color: #8da8c8;
+}
+
+main input:not([type="checkbox"]):not([type="radio"]):focus,
+main select:focus,
+main textarea:focus {
+  border-color: var(--color-blue);
+  box-shadow: 0 0 0 3px rgb(40 120 208 / 0.15);
+  background: #ffffff;
+}
+
+main input:disabled,
+main select:disabled,
+main textarea:disabled {
+  background: #f2f5f9;
+  color: #91a1b5;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   Botões padronizados (classes utilitárias de suporte)
+   ============================================================ */
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.btn-base:focus-visible {
+  outline: 3px solid rgb(40 120 208 / 0.35);
+  outline-offset: 2px;
+}
+
+.btn-base:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn-primary {
+  background: var(--color-blue);
+  border-color: var(--color-blue-hover);
+  color: #ffffff !important;
+  box-shadow: 0 2px 5px rgb(40 120 208 / 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-blue-hover);
+  box-shadow: 0 4px 10px rgb(40 120 208 / 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #ffffff;
+  border-color: #b8c8dc;
+  color: #173354 !important;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--color-blue);
+  background: #f0f6ff;
+  color: #155fac !important;
+}
+
+.btn-ghost {
+  background: #f7fafb;
+  border-color: #c6d6e8;
+  color: #216dbb !important;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: #8eafd4;
+  background: #eaf3ff;
+}
+
+.btn-success {
+  background: var(--color-success);
+  border-color: #047857;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgb(21 150 106 / 0.2);
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #047857;
+  border-color: #047857;
+}
+
+.btn-danger {
+  background: #fff7f7;
+  border-color: #fecaca;
+  color: #b42336 !important;
+}
+
+.btn-danger:hover:not(:disabled) {
+  border-color: #f28b98;
+  background: #ffe8eb;
+}
+
+/* Tamanhos de botão */
+.btn-sm { padding: 0.42rem 0.72rem; min-height: 34px; font-size: 0.8125rem; }
+.btn-md { padding: 0.56rem 1rem; min-height: 40px; font-size: 0.875rem; }
+.btn-lg { padding: 0.72rem 1.5rem; min-height: 46px; font-size: 1rem; }
+
+/* ============================================================
+   Cards e painéis padronizados
+   ============================================================ */
+.card-base {
+  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card-base:hover {
+  box-shadow: var(--shadow-md);
+  border-color: #cbd5e1;
+}
+
+.panel-base {
+  border: 1px solid #e2e8f0;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.panel-header {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.panel-body {
+  padding: 1.25rem;
+}
+
+/* ============================================================
+   Métricas / cards de indicador (dashboard)
+   ============================================================ */
+.metric-tile {
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid var(--color-blue);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem 1.25rem;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.metric-tile:hover {
+  box-shadow: var(--shadow-md);
+  border-color: #cbd5e1;
+  transform: translateY(-2px);
+}
+
+.metric-tile-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+  margin-bottom: 0.5rem;
+}
+
+.metric-tile-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+  line-height: 1.2;
+}
+
+.metric-tile-detail {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+/* Cores de acento para métricas */
+.metric-accent-blue { border-left-color: var(--color-blue); }
+.metric-accent-success { border-left-color: var(--color-success); }
+.metric-accent-warning { border-left-color: var(--color-warning); }
+.metric-accent-danger { border-left-color: var(--color-danger); }
+.metric-accent-cyan { border-left-color: var(--color-cyan); }
+
+/* ============================================================
+   Mensagens de aviso / sucesso / erro
+   ============================================================ */
+.msg-base {
+  border: 1px solid;
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.msg-success {
+  background: var(--color-success-light);
+  border-color: #bce3cd;
+  color: #0e7a50;
+}
+
+.msg-warning {
+  background: var(--color-warning-light);
+  border-color: #f0d9a8;
+  color: #8a5a0c;
+}
+
+.msg-danger {
+  background: var(--color-danger-light);
+  border-color: #f5b7c1;
+  color: #a32d42;
+}
+
+.msg-info {
+  background: var(--color-info-light);
+  border-color: #c9dcf0;
+  color: #1d5a99;
+}
+
+/* ============================================================
+   Badges de status
+   ============================================================ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1875rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.badge-success { background: var(--color-success-light); color: #0e7a50; }
+.badge-warning { background: var(--color-warning-light); color: #8a5a0c; }
+.badge-danger { background: var(--color-danger-light); color: #a32d42; }
+.badge-info { background: var(--color-info-light); color: #1d5a99; }
+.badge-neutral { background: #eef2f6; color: #475569; }
+
+/* ============================================================
+   Tabela base
+   ============================================================ */
+.table-base {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table-base th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: left;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.table-base td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: var(--color-ink);
+}
+
+.table-base tbody tr {
+  transition: background-color 0.14s ease;
+}
+
+.table-base tbody tr:hover {
+  background-color: #f4f8fd;
+}
+
+/* ============================================================
+   Workspace Gmail
+   ============================================================ */
+.gmail-folder-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 42px;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-radius: 0.65rem 0.65rem 0 0;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.gmail-folder-tab:hover { background: #f1f6fc; color: #155fac; }
+.gmail-folder-tab.is-active { border-bottom-color: #2878d0; background: #eef5fd; color: #155fac; }
+.gmail-tool {
+  min-height: 34px;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  color: #38536f;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.gmail-tool:hover { border-color: #c8d7e8; background: #fff; color: #155fac; }
+.gmail-message-row:hover { background: #f6f9fd; }
+.gmail-message-row.is-selected { background: #edf5ff; box-shadow: inset 3px 0 #2878d0; }
+.gmail-message-detail { background: #fff; }
+.gmail-message-body { color: #334155; }
+.gmail-composer-body { min-height: 250px; background: #fff; }
+.gmail-account { border-top: 3px solid #2878d0; }
+
+/* ============================================================
+   Tema escuro (dark)
+   ============================================================ */
+.dark-theme {
+  --color-canvas: #0c1422;
+  --color-surface: #141f30;
+  --color-ink: #e8eef8;
+  --color-muted: #a5b4c9;
+  color-scheme: dark;
+  min-height: 100vh;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.dark-theme main input:not([type="checkbox"]):not([type="radio"]),
+.dark-theme main select,
+.dark-theme main textarea {
+  background-color: #101a29;
+  border-color: #43556d;
+  color: #edf3fb;
+}
+
+.dark-theme main input:not([type="checkbox"]):not([type="radio"]):focus,
+.dark-theme main select:focus,
+.dark-theme main textarea:focus {
+  border-color: #56a2ff !important;
+  box-shadow: 0 0 0 3px rgb(86 162 255 / 0.2) !important;
+}
+
+.dark-theme main input:disabled,
+.dark-theme main select:disabled,
+.dark-theme main textarea:disabled {
+  background-color: #1b293c;
+  color: #91a1b5;
+}
+
+.dark-theme main option { background: #141f30; color: #edf3fb; }
+
+/* Sobreposições de cor no tema escuro */
+.dark-theme .card-base,
+.dark-theme .panel-base,
+.dark-theme .metric-tile,
+.dark-theme .btn-secondary,
+.dark-theme .btn-ghost {
+  background-color: #141f30 !important;
+  border-color: #35465d !important;
+  color: #e8eef8 !important;
+}
+
+.dark-theme .btn-secondary:hover:not(:disabled) {
+  border-color: #56a2ff !important;
+  background: #213753 !important;
+  color: #ffffff !important;
+}
+
+.dark-theme .btn-ghost:hover:not(:disabled) {
+  border-color: #5a7ba3 !important;
+  background: #1b2c43 !important;
+  color: #8fc3ff !important;
+}
+
+.dark-theme .table-base th {
+  background: #1b293c;
+  color: #93a5bc;
+  border-bottom-color: #2a3b51;
+}
+
+.dark-theme .table-base td {
+  border-bottom-color: #2a3b51;
+  color: #e8eef8;
+}
+
+.dark-theme .table-base tbody tr:hover {
+  background-color: #1b2b41;
+}
+
+.dark-theme .metric-tile {
+  border-color: #35465d;
+  background: #141f30 !important;
+}
+
+.dark-theme .msg-success { background: #153329; border-color: #2d6a4f; color: #8ce0b0; }
+.dark-theme .msg-warning { background: #332b1d; border-color: #7a5a14; color: #f4d38a; }
+.dark-theme .msg-danger { background: #3b2328; border-color: #7a2d3e; color: #ffb0b8; }
+.dark-theme .msg-info { background: #172c47; border-color: #2d5a99; color: #9bc9ff; }
+
+.dark-theme .badge-success { background: #153329; color: #8ce0b0; }
+.dark-theme .badge-warning { background: #332b1d; color: #f4d38a; }
+.dark-theme .badge-danger { background: #3b2328; color: #ffb0b8; }
+.dark-theme .badge-info { background: #172c47; color: #9bc9ff; }
+.dark-theme .badge-neutral { background: #2a3b51; color: #c5d1e1; }
+
+.dark-theme .panel-header { border-bottom-color: #2a3b51; }
+.dark-theme .panel-header h2 { color: #e8eef8; }
+
+.dark-theme .gmail-folder-tab { color: #a5b4c9; }
+.dark-theme .gmail-folder-tab:hover { background: #1b2c43; color: #b7d9ff; }
+.dark-theme .gmail-folder-tab.is-active { border-bottom-color: #56a2ff; background: #172c47; color: #b7d9ff; }
+.dark-theme .gmail-tool { color: #c3d0e0; }
+.dark-theme .gmail-tool:hover { border-color: #43556d; background: #1b2c43; color: #b7d9ff; }
+.dark-theme .gmail-message-row:hover { background: #17263a; }
+.dark-theme .gmail-message-row.is-selected { background: #1b3554; box-shadow: inset 3px 0 #56a2ff; }
+.dark-theme .gmail-message-detail,
+.dark-theme .gmail-composer-body { background: #101a29; color: #e8eef8; }
+.dark-theme .gmail-message-body { color: #d5dfeb; }
+.dark-theme .gmail-workspace [class*="bg-slate-50"] { background-color: #172438 !important; }
+.dark-theme .gmail-workspace [class*="border-slate-"] { border-color: #2a3b51 !important; }
+.dark-theme .gmail-workspace [class*="bg-blue-100"] { background-color: #17375c !important; color: #bfdbfe !important; }
+
+/* Cabeçalho e sidebar no tema escuro */
+.dark-theme .app-topbar {
+  background-color: rgb(15 25 40 / 0.94);
+  border-color: #29394f;
+}
+
+.dark-theme .app-topbar [class~="text-slate-500"],
+.dark-theme .app-topbar [class~="text-slate-600"],
+.dark-theme .app-topbar [class~="text-slate-800"] { color: #c7d3e2 !important; }
+.dark-theme .app-topbar [class*="border-slate-"] { border-color: #42536b !important; }
+
+.dark-theme main button:not([class*="bg-blue"]):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-cyan"]):not([class*="bg-navy"]) {
+  color: #e8eef8;
+}
+
+.dark-theme main button:hover:not(:disabled) { filter: brightness(1.08); }
+
+/* ============================================================
+   Utilitários de layout e hierarquia
+   ============================================================ */
+.section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-bottom: 0.75rem;
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+  margin: 0 0 0.25rem 0;
+}
+
+.page-subtitle {
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Utilitários de line-clamp para textos longos em tabelas */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}

@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Nexo CRM — WhatsApp em aba única",
+  "version": "1.0.0",
+  "description": "Reutiliza uma única aba do WhatsApp Web ao abrir contatos pelo Nexo CRM.",
+  "permissions": ["tabs"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
+    "https://web.whatsapp.com/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*"
+      ],
+      "js": ["content-script.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

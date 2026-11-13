@@ -1,0 +1,17 @@
+﻿.next/
+out/
+node_modules/
+.env*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+
+# Arquivos temporários locais e backups
+.npm-cache/
+.npm-logs/
+tmp/
+desktop.ini
+
+
+# Arquivo local com histórico operacional/sensível
+SCRIPT.txt
