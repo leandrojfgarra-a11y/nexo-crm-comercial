@@ -93,33 +93,8 @@ export default async function FunnelPage({ searchParams }: { searchParams: Searc
         const accountantMap = new Map(((accountantRows ?? []) as any[]).map(row => [row.id, row]))
         const additionalByOpportunity = new Map<string, string[]>()
         for (const row of (productLinkResult.data ?? []) as any[]) additionalByOpportunity.set(row.opportunity_id, [...(additionalByOpportunity.get(row.opportunity_id) ?? []), row.product_id])
-        const linkedPeople = new Set(opportunityRows.map(row => row.person_id))
-        const linkedLeads = new Set(allOpportunityRows.map(row => row.lead_id).filter(Boolean))
         const search = (params.q ?? '').trim().toLocaleLowerCase('pt-BR')
         const sellerFilter = params.seller ?? ''
-
-        for (const lead of leadRows) {
-          if (!lead.person_id || ['converted','lost'].includes(lead.status) || linkedLeads.has(lead.id) || linkedPeople.has(lead.person_id)) continue
-          if (sellerFilter && lead.seller_id !== sellerFilter) continue
-          const person = personMap.get(lead.person_id)
-          if (!person) continue
-          const name = person.trade_name || person.name
-          const productId = lead.interest_product_id ?? ''
-          const haystack = [name,person.name,productMap.get(productId) ?? '',sellerMap.get(lead.seller_id) ?? ''].join(' ').toLocaleLowerCase('pt-BR')
-          if (search && !haystack.includes(search)) continue
-          const firstStage = stages.find(stage => stage.name === 'Leads')
-          if (!firstStage) continue
-          cards.push({
-            id: lead.id, leadId: lead.id, type: 'lead', personId: lead.person_id, subjectId: lead.id, subjectType: 'lead',
-            subjectLabel: name, sellerName: sellerMap.get(lead.seller_id) ?? '', sellerId: lead.seller_id ?? '',
-            productName: productMap.get(productId) ?? '', productId,
-            title: person.name, installationValue: null, monthlyValue: null,
-            openedAt: String(lead.created_at).slice(0,10), expectedCloseDate: '', notes: lead.notes ?? '',
-            stageId: firstStage.id, status: 'open',
-            details: person as any,
-          })
-          subjects.push({ value: 'lead:' + lead.id, label: 'Lead · ' + (person.trade_name && person.trade_name !== person.name ? person.trade_name + ' — ' + person.name : person.name) })
-        }
 
         for (const customer of customerRows) {
           const person = personMap.get(customer.person_id)
