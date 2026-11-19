@@ -15,22 +15,27 @@ export function normalizeCustomerProduct(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 }
 
-export type CustomerProductCatalogItem = { id: string; name: string; internal_code?: string | null }
+export type CustomerProductCatalogItem = { id: string; name: string; internal_code?: string | null; active: boolean }
 
 export function matchCustomerProduct(optionCode: string, products: CustomerProductCatalogItem[]) {
   const option = CUSTOMER_PRODUCT_OPTIONS.find(item => item.code === optionCode)
   if (!option) return undefined
   const headerNames: readonly string[] = option.names
-  const exact = products.filter(product => {
-    const code = normalizeCustomerProduct(product.internal_code ?? '')
+  const activeProducts = products.filter(product => product.active)
+  const codeMatches = activeProducts.filter(product => headerNames.includes(normalizeCustomerProduct(product.internal_code ?? '')))
+  if (codeMatches.length === 1) return codeMatches[0]
+  if (codeMatches.length > 1) return undefined
+
+  const nameMatches = activeProducts.filter(product => {
     const name = normalizeCustomerProduct(product.name)
-    return headerNames.includes(code) || headerNames.includes(name)
+    return headerNames.includes(name)
       || (optionCode === 'LIMITADOR NOTA' && /^LIMITADORDENOTAS?$/.test(name))
   })
-  if (exact.length === 1) return exact[0]
-  if (exact.length > 1) return undefined
+  if (nameMatches.length === 1) return nameMatches[0]
+  if (nameMatches.length > 1) return undefined
+
   const aliases: readonly string[] = option.names
-  const partial = products.filter(product => {
+  const partial = activeProducts.filter(product => {
     const name = normalizeCustomerProduct(product.name)
     return aliases.some(alias => alias.length >= 4 && name.includes(alias))
   })

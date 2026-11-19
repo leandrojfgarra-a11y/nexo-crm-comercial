@@ -10,14 +10,31 @@ test('mantém os dez produtos contratados esperados e normaliza seus cabeçalhos
 })
 
 test('associa cada código ao produto único existente no catálogo', () => {
-  const catalog = CUSTOMER_PRODUCT_OPTIONS.map((item, index) => ({ id: `product-${index}`, name: item.label }))
+  const catalog = CUSTOMER_PRODUCT_OPTIONS.map((item, index) => ({ id: `product-${index}`, name: item.label, internal_code: item.code, active: true }))
   assert.deepEqual(CUSTOMER_PRODUCT_OPTIONS.map(item => matchCustomerProduct(item.code, catalog)?.id), catalog.map(item => item.id))
+})
+
+test('prioriza o código APP exato sobre uma coincidência de nome', () => {
+  const catalog = [
+    { id: 'app-canonico', name: 'Aplicativo Garra', internal_code: 'APP', active: true },
+    { id: 'app-nome', name: 'APP', internal_code: 'OUTRO', active: true },
+  ]
+  assert.equal(matchCustomerProduct('APP', catalog)?.id, 'app-canonico')
+})
+
+test('usa o nome APP quando não há código correspondente e ignora produtos inativos', () => {
+  const catalog = [
+    { id: 'app-inativo', name: 'APP', internal_code: 'APP', active: false },
+    { id: 'app-ativo', name: 'APP', internal_code: null, active: true },
+  ]
+  assert.equal(matchCustomerProduct('APP', catalog)?.id, 'app-ativo')
+  assert.equal(matchCustomerProduct('APP', [catalog[0]]), undefined)
 })
 
 test('não escolhe um produto automaticamente quando o catálogo tem correspondência ambígua', () => {
   const matches = [
-    { id: 'ct-e-1', name: 'CT-E' },
-    { id: 'ct-e-2', name: 'CT-E' },
+    { id: 'ct-e-1', name: 'CT-E', active: true },
+    { id: 'ct-e-2', name: 'CT-E', active: true },
   ]
   assert.equal(matchCustomerProduct('CT-E', matches), undefined)
 })
