@@ -35,6 +35,16 @@ export async function hasHistoricalCustomerImportSchema(supabase: SupabaseClient
   return !customers.error && !people.error && !products.error
 }
 
+export async function hasCustomerProductMonthlyFeeSchema(supabase: SupabaseClient) {
+  const { error } = await supabase.from('customer_products').select('monthly_fee').limit(0)
+  return !error
+}
+
+export async function hasCustomerProductSchema(supabase: SupabaseClient) {
+  const { error } = await supabase.from('customer_products').select('customer_id,product_id').limit(0)
+  return !error
+}
+
 export async function hasClicksignContractSchema(supabase: SupabaseClient) {
   const { error } = await supabase.from('customer_contracts')
     .select('clicksign_envelope_id,clicksign_document_id,clicksign_signer_id,clicksign_status,clicksign_synced_at')

@@ -3,12 +3,44 @@
 import { redirect } from 'next/navigation'
 import { parsePerson } from '@/lib/crm-validation'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { hasBusinessActivitySchema, hasCompleteCustomerSchema } from '@/lib/customer-schema'
+import { hasBusinessActivitySchema, hasCompleteCustomerSchema, hasCustomerProductMonthlyFeeSchema, hasCustomerProductSchema } from '@/lib/customer-schema'
 import { resolveTenantContext } from '@/lib/tenant/context'
 
 const customerPath = '/clientes'
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 function notice(value: string): never { redirect(`${customerPath}?notice=${encodeURIComponent(value)}`) }
+
+async function saveCustomerProductLinks(supabase: Awaited<ReturnType<typeof createAdminClient>>, companyId: string, customerId: string, formData: FormData) {
+  if (formData.get('customer_product_links_enabled') !== '1') return null
+  if (!(await hasCustomerProductSchema(supabase))) return 'O relacionamento de produtos não está disponível neste banco; nenhum vínculo foi salvo.'
+  const productIds = formData.getAll('customer_product_id').map(value => String(value).trim())
+  if (productIds.length > 200 || productIds.some(productId => !uuidPattern.test(productId)) || new Set(productIds).size !== productIds.length) return 'Revise os produtos vinculados ao cliente.'
+  const { data: products, error: productError } = productIds.length
+    ? await supabase.from('products').select('id').eq('company_id', companyId).in('id', productIds)
+    : { data: [], error: null }
+  if (productError || (products ?? []).length !== productIds.length) return 'Um dos produtos não existe no catálogo desta empresa.'
+  const { data: customer, error: customerError } = await supabase.from('customers').select('id').eq('id', customerId).eq('company_id', companyId).maybeSingle()
+  if (customerError || !customer) return 'Cliente não pertence à empresa atual; vínculos não foram salvos.'
+
+  const monthlyFeeReady = await hasCustomerProductMonthlyFeeSchema(supabase)
+  const existingLinks = monthlyFeeReady
+    ? await supabase.from('customer_products').select('product_id,monthly_fee').eq('company_id', companyId).eq('customer_id', customerId)
+    : { data: [], error: null }
+  if (existingLinks.error) return 'Não foi possível preservar os dados históricos dos vínculos existentes.'
+  const fees = new Map((existingLinks.data ?? []).map(link => [link.product_id, link.monthly_fee]))
+  if (productIds.length) {
+    const links = productIds.map(productId => ({
+      company_id: companyId, customer_id: customerId, product_id: productId,
+      ...(monthlyFeeReady ? { monthly_fee: fees.get(productId) ?? null } : {}),
+    }))
+    const { error } = await supabase.from('customer_products').upsert(links, { onConflict: 'company_id,customer_id,product_id' })
+    if (error) return 'Não foi possível salvar os produtos contratados.'
+  }
+  const staleQuery = supabase.from('customer_products').delete().eq('company_id', companyId).eq('customer_id', customerId)
+  const { error: staleError } = productIds.length ? await staleQuery.not('product_id', 'in', `(${productIds.join(',')})`) : await staleQuery
+  if (staleError) return 'Os produtos marcados foram salvos, mas não foi possível remover os vínculos desmarcados.'
+  return null
+}
 
 export async function saveCustomer(formData: FormData) {
   const supabase = await createAdminClient()
@@ -80,6 +112,8 @@ export async function saveCustomer(formData: FormData) {
     if (personError) notice('Não foi possível atualizar os dados cadastrais.')
     const { error: customerError } = await supabase.from('customers').update(commercial).eq('id', id).eq('company_id', companyId)
     if (customerError) notice('Dados cadastrais atualizados, mas não foi possível salvar a situação/observação. Tente novamente.')
+    const productError = await saveCustomerProductLinks(supabase, companyId, id, formData)
+    if (productError) redirect(`/clientes/${id}?notice=customer-products-error`)
     redirect(`/clientes/${id}?notice=${schemaReady ? 'customer-updated' : 'customer-updated-schema-pending'}`)
   }
 
@@ -90,6 +124,8 @@ export async function saveCustomer(formData: FormData) {
     await supabase.from('people').delete().eq('id', createdPerson.id).eq('company_id', companyId)
     notice(customerError.code === '23505' ? 'Esta pessoa já está cadastrada como cliente.' : 'Não foi possível concluir o cadastro do cliente.')
   }
+  const productError = await saveCustomerProductLinks(supabase, companyId, createdCustomer.id, formData)
+  if (productError) redirect(`/clientes/${createdCustomer.id}?notice=customer-products-error`)
   redirect(`/clientes/${createdCustomer.id}?notice=${schemaReady ? 'customer-created' : 'customer-created-schema-pending'}`)
 }
 

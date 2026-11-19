@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { saveCustomer } from '@/app/clientes/actions'
 import { createQuickAccountant } from '@/app/contadores/actions'
 import { applyLookupValues } from '@/lib/apply-lookup-values'
+import { CUSTOMER_PRODUCT_OPTIONS, matchCustomerProduct } from '@/lib/customer-products'
 
 export type CustomerFormValues = {
   id?: string; status?: string | null; customer_notes?: string | null; source?: string | null; seller_id?: string | null; accountant_id?: string | null;
@@ -14,6 +15,8 @@ export type CustomerFormValues = {
 }
 type Option = { id: string; name: string }
 export type AccountantOption = Option & { kind?: string; trade_name?: string | null; tax_id?: string | null; contact_name?: string | null; email?: string | null; phone?: string | null; mobile_phone?: string | null; whatsapp?: string | null; postal_code?: string | null; address_line?: string | null; address_number?: string | null; address_extra?: string | null; district?: string | null; city?: string | null; state?: string | null; active?: boolean }
+type CustomerProductOption = { id: string; name: string; internal_code?: string | null; kind: string; default_monthly_value: number | null; reference_price: number | null; active: boolean }
+type CustomerProductLink = { productId: string }
 
 const input = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-blue focus:ring-2 focus:ring-blue/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500'
 const label = 'flex flex-col gap-1 text-sm font-medium text-ink'
@@ -27,10 +30,13 @@ const tabs = [
   { key: 'relacionamento', label: 'Relacionamento Comercial' },
 ] as const
 
-export function CustomerForm({ initial = {}, sellers = [], accountants = [], schemaReady, accountantDetailsReady = false, businessActivityReady = false, mode }: {
+export function CustomerForm({ initial = {}, sellers = [], accountants = [], products = [], customerProducts = [], productLinksReady = false, schemaReady, accountantDetailsReady = false, businessActivityReady = false, mode }: {
   initial?: CustomerFormValues
   sellers?: Option[]
   accountants?: AccountantOption[]
+  products?: CustomerProductOption[]
+  customerProducts?: CustomerProductLink[]
+  productLinksReady?: boolean
   schemaReady: boolean
   accountantDetailsReady?: boolean
   businessActivityReady?: boolean
@@ -38,6 +44,7 @@ export function CustomerForm({ initial = {}, sellers = [], accountants = [], sch
 }) {
   const formRef = useRef<HTMLFormElement>(null)
   const [activeTab, setActiveTab] = useState<'identificacao' | 'fiscal' | 'contato-endereco' | 'relacionamento'>('identificacao')
+  const [selectedProducts, setSelectedProducts] = useState<CustomerProductLink[]>(customerProducts)
   const [lookup, setLookup] = useState('')
   const [lookupError, setLookupError] = useState(false)
   const [isLookingUpCnpj, setIsLookingUpCnpj] = useState(false)
@@ -364,8 +371,48 @@ export function CustomerForm({ initial = {}, sellers = [], accountants = [], sch
           aria-labelledby="tab-relacionamento-title"
         >
           <h2 id="tab-relacionamento-title" className="sr-only">Relacionamento Comercial</h2>
+          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-ink">Produtos e serviços</p>
+              <p className="mt-1 text-sm text-muted">Edite o catálogo central em outra aba; os dados preenchidos neste cadastro serão preservados.</p>
+            </div>
+            <Link
+              href="/produtos"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex w-fit items-center justify-center rounded-lg border border-blue/30 px-4 py-2 text-sm font-semibold text-blue transition hover:bg-blue/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue"
+            >
+              Editar produtos e serviços
+            </Link>
+          </div>
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="font-semibold text-ink">Produtos contratados</h3>
+            <p className="mt-1 text-sm text-muted">Marque os produtos vinculados. Na importação, mensalidade e vencimento são referências totais do cliente, sem rateio entre produtos.</p>
+            {!productLinksReady ? <p className="mt-3 msg-base msg-warning">O relacionamento de produtos não está disponível neste banco; nenhum vínculo será alterado.</p> : <>
+              <input type="hidden" name="customer_product_links_enabled" value="1" />
+              {selectedProducts.map(link => <input key={link.productId} type="hidden" name="customer_product_id" value={link.productId} />)}
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {CUSTOMER_PRODUCT_OPTIONS.map(option => {
+                  const product = matchCustomerProduct(option.code, products)
+                  const checked = Boolean(product && selectedProducts.some(link => link.productId === product.id))
+                  return <label key={option.code} className={`flex min-h-14 items-start gap-3 rounded-lg border p-3 ${product ? 'cursor-pointer border-slate-200 hover:border-blue/50' : 'border-amber-200 bg-amber-50'}`}>
+                    <input type="checkbox" checked={checked} disabled={!product} onChange={event => {
+                      if (!product) return
+                      setSelectedProducts(current => event.target.checked
+                        ? current.some(link => link.productId === product.id) ? current : [...current, { productId: product.id }]
+                        : current.filter(link => link.productId !== product.id))
+                    }} className="mt-0.5 accent-blue" aria-label={option.label} />
+                    <span><strong className="block text-sm">{option.label}</strong><span className="text-xs text-muted">{product?.name ?? 'Correspondência ausente ou ambígua no catálogo; seleção indisponível.'}</span></span>
+                  </label>
+                })}
+              </div>
+              {selectedProducts.some(link => !products.some(product => product.id === link.productId)) && <p className="mt-3 text-xs text-amber-800">Há vínculos existentes fora do catálogo carregado; eles serão preservados.</p>}
+              <p className="mt-3 text-xs text-muted">Vínculos selecionados: {selectedProducts.length}. O formulário referencia itens existentes no catálogo, sem duplicar produtos.</p>
+            </>}
+            <Link href="/produtos" target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm font-semibold text-blue hover:underline">Gerenciar catálogo de produtos</Link>
+          </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div className={`${label} sm:col-span-2`}>
+          <div className={`${label} sm:col-span-2`}>
               <div className="flex flex-col gap-1.5">
                 <span className="text-sm font-medium text-ink">Contador / escritório</span>
                 <input type="hidden" name="accountant_id" value={selectedAccountantId} />
@@ -412,6 +459,14 @@ export function CustomerForm({ initial = {}, sellers = [], accountants = [], sch
 
       {/* Rodapé com botões padronizados */}
       <div className="mt-6 flex flex-wrap gap-3 justify-end">
+        <Link
+          href="/produtos"
+          target="_blank"
+          rel="noreferrer"
+          className="btn-base btn-secondary btn-md"
+        >
+          Editar produtos do catálogo
+        </Link>
         <Link href={isEdit ? `/clientes/${initial.id}` : '/clientes'} className="btn-base btn-secondary btn-md">Voltar</Link>
         <button type="submit" className="btn-base btn-primary btn-md">{isEdit ? 'Salvar alterações' : 'Cadastrar cliente'}</button>
       </div>

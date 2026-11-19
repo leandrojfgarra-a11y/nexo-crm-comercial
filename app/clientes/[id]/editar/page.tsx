@@ -2,21 +2,28 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { CustomerForm, type CustomerFormValues } from '@/components/customer-form'
 import { PageHeader } from '@/components/ui'
-import { hasBusinessActivitySchema, hasCompleteAccountantSchema, hasCompleteCustomerSchema } from '@/lib/customer-schema'
+import { hasBusinessActivitySchema, hasCompleteAccountantSchema, hasCompleteCustomerSchema, hasCustomerProductSchema } from '@/lib/customer-schema'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isUuid } from '@/lib/customer-files'
 import { resolveTenantContext } from '@/lib/tenant/context'
+import { hasProductCatalogSchema } from '@/lib/product-catalog'
 
 export default async function EditCustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   if (!isUuid(id)) notFound()
   const supabase = await createAdminClient()
   const { companyId } = await resolveTenantContext(supabase)
-  const [{ data: customer }, schemaReady, businessActivityReady, { data: sellers }] = await Promise.all([
+  const customerProductSchemaReady = await hasCustomerProductSchema(supabase)
+  const [{ data: customer }, schemaReady, businessActivityReady, { data: sellers }, catalogReady, productsResult, customerProductsResult] = await Promise.all([
     supabase.from('customers').select('*,people(*)').eq('id', id).eq('company_id', companyId).maybeSingle(),
     hasCompleteCustomerSchema(supabase),
     hasBusinessActivitySchema(supabase),
     supabase.from('sellers').select('id,name').eq('company_id', companyId).eq('active', true).order('name'),
+    hasProductCatalogSchema(supabase),
+    supabase.from('products').select('id,name,internal_code,kind,default_monthly_value,reference_price,active').eq('company_id', companyId).order('name'),
+    customerProductSchemaReady
+      ? supabase.from('customer_products').select('product_id').eq('company_id', companyId).eq('customer_id', id)
+      : Promise.resolve({ data: [], error: null }),
   ])
   if (!customer) notFound()
   const person = (Array.isArray(customer.people) ? customer.people[0] : customer.people) as Record<string, string | boolean | null> | null
@@ -25,6 +32,7 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
   const accountantDetailsReady = await hasCompleteAccountantSchema(supabase)
   const { data: accountantRows } = schemaReady ? await supabase.from('accountants').select(accountantDetailsReady ? 'id,kind,name,trade_name,tax_id,contact_name,email,phone,mobile_phone,whatsapp,postal_code,address_line,address_number,address_extra,district,city,state,active' : 'id,name,active,email,phone').eq('company_id', companyId).order('name') : { data: [] }
   const accountants = (accountantRows ?? []) as unknown as import('@/components/customer-form').AccountantOption[]
+  const productLinks = (customerProductsResult.data ?? []).map((row: { product_id: string }) => ({ productId: row.product_id }))
   const initial: CustomerFormValues = {
     id: customer.id, status: customer.status, customer_notes: customer.notes, source: customer.source,
     seller_id: customer.seller_id, accountant_id: customer.accountant_id,
@@ -40,6 +48,6 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
   return <>
     <Link href={`/clientes/${id}`} className="mb-5 inline-block text-sm font-semibold text-blue">← Voltar para ficha 360°</Link>
     <PageHeader eyebrow="Relacionamento · Clientes" title="Editar cadastro" subtitle={str('name') ?? 'Atualize os dados do cliente.'} />
-    <CustomerForm mode="edit" initial={initial} schemaReady={schemaReady} accountantDetailsReady={accountantDetailsReady} businessActivityReady={businessActivityReady} sellers={sellers ?? []} accountants={accountants} />
+    <CustomerForm mode="edit" initial={initial} schemaReady={schemaReady} accountantDetailsReady={accountantDetailsReady} businessActivityReady={businessActivityReady} sellers={sellers ?? []} accountants={accountants} products={catalogReady && !productsResult.error ? (productsResult.data ?? []) as {id:string;name:string;internal_code:string|null;kind:string;default_monthly_value:number|null;reference_price:number|null;active:boolean}[] : []} customerProducts={productLinks} productLinksReady={customerProductSchemaReady && catalogReady && !customerProductsResult.error && !productsResult.error} />
   </>
 }

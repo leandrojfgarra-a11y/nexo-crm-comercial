@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 import { validCnpj, validCpf } from '@/lib/crm-validation'
 import { importHistoricalCustomers, findHistoricalCustomerDuplicates } from '@/app/clientes/importar/actions'
 import { repairMojibake } from '@/lib/text-encoding'
+import { CUSTOMER_PRODUCT_OPTIONS, matchCustomerProduct, normalizeCustomerProduct } from '@/lib/customer-products'
 
 type Product = { id: string; name: string; internal_code: string | null; active: boolean }
 type Inscription = { number: string; state: string | null; active: boolean | null; regime: string | null }
@@ -26,17 +27,33 @@ type CustomerRow = {
 
 const input = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-blue focus:ring-2 focus:ring-blue/15'
 const panel = 'overflow-hidden rounded-xl border border-slate-200 bg-surface shadow-sm'
-const PRODUCT_COLUMNS = [
-  { index: 5, code: 'CT-E', label: 'CT-E' }, { index: 6, code: 'APP', label: 'APP' },
-  { index: 7, code: 'NFP-E', label: 'NFP-E' }, { index: 8, code: 'BOLETO', label: 'BOLETO' },
-  { index: 9, code: 'NFSE', label: 'NFSE' }, { index: 10, code: 'MDF-E', label: 'MDF-E' },
-  { index: 11, code: 'BACKUP', label: 'BACKUP' }, { index: 12, code: 'LIMITADOR NOTAS', label: 'LIMITADOR NOTAS' },
-  { index: 13, code: 'GARRAX', label: 'GARRAX' }, { index: 14, code: 'NFCE', label: 'NFCE' },
-]
+const PRODUCT_COLUMNS = CUSTOMER_PRODUCT_OPTIONS.map((option, index) => ({ ...option, index: index + 5 }))
 const norm = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 const txt = (value: unknown) => value == null ? '' : repairMojibake(String(value).trim())
 function documentValue(value: unknown) {
-  return txt(value).toUpperCase().replace(/[.\/-\s]/g, '')
+  const document = txt(value).toUpperCase().replace(/[.\-/\s]/g, '')
+  // Excel commonly stores CPF/CNPJ as a number and drops leading zeroes.
+  // Restore only the unambiguous one-digit-short numeric forms.
+  if (/^\d{10}$/.test(document)) return document.padStart(11, '0')
+  if (/^\d{13}$/.test(document)) return document.padStart(14, '0')
+  return document
+}
+function customerStatus(value: unknown): CustomerRow['status'] {
+  const status = txt(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase()
+  if (['A', 'AT', 'ATIVO', 'ATIVA', 'ACTIVE'].includes(status)) return 'active'
+  if (['I', 'INATIVO', 'INATIVA', 'INACTIVE'].includes(status)) return 'inactive'
+  return ''
+}
+function rowBlockReasons(row: CustomerRow, existingDocs: Set<string>, mapping: Record<string, string>) {
+  const reasons: string[] = []
+  if (!row.name) reasons.push('Razão social/nome ausente')
+  if (!row.status) reasons.push('Situação não reconhecida; informe A/Ativo ou I/Inativo na planilha')
+  if (row.taxId && !(row.kind === 'individual' ? validCpf(row.taxId) : validCnpj(row.taxId))) reasons.push('CPF/CNPJ inválido; confira os dígitos ou corrija a planilha')
+  if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) reasons.push('E-mail inválido')
+  if (row.sourceDuplicate) reasons.push('CPF/CNPJ repetido em outra linha do arquivo')
+  if (row.taxId && existingDocs.has(row.taxId)) reasons.push('CPF/CNPJ já cadastrado nesta empresa no CRM')
+  if (row.productCodes.some(code => !mapping[code])) reasons.push('Associe os produtos marcados como SIM ao catálogo')
+  return reasons
 }
 function moneyValue(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return Math.round(value * 100) / 100
@@ -57,6 +74,10 @@ function apiDate(value: string | null | undefined) {
   if (match) return match[1]
   const br = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
   return br ? `${br[3]}-${br[2]}-${br[1]}` : ''
+}
+function firstValidEmail(value: unknown) {
+  const matches = txt(value).toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g) ?? []
+  return matches.find(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) ?? ''
 }
 
 export function HistoricalCustomerImport({ products, schemaReady, productSchemaReady }: { products: Product[]; schemaReady: boolean; productSchemaReady: boolean }) {
@@ -95,6 +116,15 @@ export function HistoricalCustomerImport({ products, schemaReady, productSchemaR
       if (!sheet?.['!ref']) throw new Error('Não encontrei uma aba com dados na planilha.')
       const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: '', blankrows: false })
       if (matrix.length > 10001) throw new Error('A planilha excede o limite de 10.000 linhas.')
+      const headerCells = matrix[0] ?? []
+      const productIndexes = new Map<string, number>()
+      for (const column of PRODUCT_COLUMNS) {
+        const headerMatch = headerCells.findIndex(cell => {
+          const header = normalizeCustomerProduct(txt(cell))
+          return column.headers.some(alias => header === alias || (alias.length >= 3 && header.includes(alias)))
+        })
+        productIndexes.set(column.code, headerMatch >= 0 ? headerMatch : column.index)
+      }
       const seen = new Set<string>()
       const parsed: CustomerRow[] = []
       for (let index = 1; index < matrix.length; index++) {
@@ -103,17 +133,17 @@ export function HistoricalCustomerImport({ products, schemaReady, productSchemaR
         const taxId = documentValue(cells[15])
         const repeated = Boolean(taxId && seen.has(taxId))
         if (taxId) seen.add(taxId)
-        const statusValue = txt(cells[0]).toUpperCase()
-        const productCodes = PRODUCT_COLUMNS.filter(column => txt(cells[column.index]).toUpperCase() === 'SIM').map(column => column.code)
+        const status = customerStatus(cells[0])
+        const productCodes = PRODUCT_COLUMNS.filter(column => txt(cells[productIndexes.get(column.code) ?? column.index]).normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase() === 'SIM').map(column => column.code)
         const unknownProducts = PRODUCT_COLUMNS.filter(column => {
-          const value = txt(cells[column.index]).toUpperCase()
+          const value = txt(cells[productIndexes.get(column.code) ?? column.index]).normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase()
           return value !== '' && value !== 'SIM' && value !== 'NÃO' && value !== 'NAO'
         }).map(column => `${column.code}: ${txt(cells[column.index])}`)
         parsed.push({
           id: `row-${index + 1}`, rowNumber: index + 1, kind: taxId.length === 11 ? 'individual' : 'company',
-          status: statusValue === 'A' ? 'active' : statusValue === 'I' ? 'inactive' : '',
+          status,
           tradeName: txt(cells[2]), name: txt(cells[3]), taxId,
-          phone: txt(cells[18]), whatsapp: txt(cells[19]), email: txt(cells[20]).toLowerCase(),
+          phone: txt(cells[18]), whatsapp: txt(cells[19]), email: firstValidEmail(cells[20]),
           legacyContractStatus: txt(cells[4]), productCodes, unknownProducts,
           monthlyFee: moneyValue(cells[16]), billingDay: billingDay(cells[17]), legacyCode: txt(cells[1]),
           sourceDuplicate: repeated, inscriptions: [], stateRegistration: '', lookupMessage: '', lookupBusy: false,
@@ -125,7 +155,7 @@ export function HistoricalCustomerImport({ products, schemaReady, productSchemaR
       const preselected = parsed.filter(row => !row.sourceDuplicate && row.status && row.name.length >= 2 && row.taxId && (row.kind === 'individual' ? validCpf(row.taxId) : validCnpj(row.taxId)) && (!row.email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)))
       const newMapping: Record<string, string> = {}
       for (const column of PRODUCT_COLUMNS) {
-        const match = products.find(product => norm(product.internal_code ?? '') === norm(column.code)) ?? products.find(product => norm(product.name).includes(norm(column.code)))
+        const match = matchCustomerProduct(column.code, products)
         if (match) newMapping[column.code] = match.id
       }
       setRows(parsed); setFileName(file.name); setSelected(new Set(preselected.map(row => row.id))); setMapping(newMapping); setPage(0)
@@ -142,12 +172,23 @@ export function HistoricalCustomerImport({ products, schemaReady, productSchemaR
 
   async function checkDuplicates() {
     setBusy(true); setError(''); setMessage('')
-    const result = await findHistoricalCustomerDuplicates(selectedRows.map(row => row.taxId).filter(Boolean))
+    const taxIds = selectedRows.map(row => row.taxId).filter(Boolean)
+    const found = new Set<string>()
+    try {
+      for (let offset = 0; offset < taxIds.length; offset += 100) {
+        const result = await findHistoricalCustomerDuplicates(taxIds.slice(offset, offset + 100))
+        if (!result.ok) { setBusy(false); setError(result.error); return }
+        result.taxIds.forEach(taxId => found.add(taxId))
+      }
+    } catch {
+      setBusy(false); setError('Não foi possível conferir duplicidades. Verifique a conexão e tente novamente.'); return
+    }
     setBusy(false)
-    if (!result.ok) { setError(result.error); return }
-    const found = new Set(result.taxIds)
-    setExistingDocs(found); setCheckedSelection(selectionKey)
-    setMessage(found.size ? `${found.size} documento(s) já existem no CRM. Essas linhas serão bloqueadas para evitar duplicidade.` : 'Conferência concluída: nenhum CPF/CNPJ selecionado consta no CRM.')
+    const remaining = selectedRows.filter(row => !row.taxId || !found.has(row.taxId))
+    setExistingDocs(found)
+    setSelected(new Set(remaining.map(row => row.id)))
+    setCheckedSelection(remaining.map(row => row.id).sort().join('|'))
+    setMessage(found.size ? `${found.size} documento(s) já existem no CRM. As linhas duplicadas foram retiradas da seleção e bloqueadas para evitar duplicidade.` : 'Conferência concluída: nenhum CPF/CNPJ da seleção consta no CRM.')
   }
 
   async function lookupRow(id: string) {
@@ -198,7 +239,6 @@ export function HistoricalCustomerImport({ products, schemaReady, productSchemaR
 
   async function submitImport() {
     if (!schemaReady || !productSchemaReady) { setError('A migration complementar precisa ser aplicada manualmente antes da gravação.'); return }
-    if (selectedRows.length > 25) { setError('Para o teste, importe no máximo 25 clientes por lote.'); return }
     if (!selectedRows.length) { setError('Selecione ao menos um cliente válido.'); return }
     if (checkedSelection !== selectionKey) { setError('Confira duplicidades para a seleção atual antes de importar.'); return }
     if (selectedRows.some(row => row.sourceDuplicate || (row.taxId && existingDocs.has(row.taxId)))) { setError('Retire da seleção as linhas duplicadas na planilha ou já existentes no CRM.'); return }
@@ -214,15 +254,40 @@ export function HistoricalCustomerImport({ products, schemaReady, productSchemaR
       product_ids: [...new Set(row.productCodes.map(code => mapping[code]).filter(Boolean))],
     }))
     if (!window.confirm(`Importar ${payload.length} cliente(s) como base histórica? Nenhum lead, oportunidade, contrato ou card do funil será criado.`)) return
+    const importedIds = new Set<string>()
+    let importedCount = 0
+    let failure = ''
     setBusy(true); setError(''); setMessage('')
-    const result = await importHistoricalCustomers(JSON.stringify(payload))
+    for (let offset = 0; offset < payload.length; offset += 25) {
+      const batch = payload.slice(offset, offset + 25)
+      let result: Awaited<ReturnType<typeof importHistoricalCustomers>>
+      try {
+        result = await importHistoricalCustomers(JSON.stringify(batch))
+      } catch {
+        failure = 'Falha de conexão durante o envio. O lote atual pode ter sido gravado; confira novamente as duplicidades antes de tentar outra vez.'
+        break
+      }
+      if (!result.ok) { failure = result.error; break }
+      if (result.imported !== batch.length) {
+        failure = `O servidor confirmou ${result.imported} de ${batch.length} registros neste lote. O lote foi mantido na prévia para conferência.`
+        break
+      }
+      importedCount += result.imported
+      for (const row of selectedRows.slice(offset, offset + 25)) importedIds.add(row.id)
+    }
     setBusy(false)
-    if (!result.ok) { setError(result.error); return }
-    setMessage(`${result.imported} cliente(s) importado(s) para a base histórica. Nenhum registro foi criado no funil.`)
-    const importedIds = new Set(selectedRows.map(row => row.id))
-    setRows(current => current.filter(row => !importedIds.has(row.id)))
-    setSelected(new Set())
-    setExistingDocs(new Set()); setCheckedSelection('')
+    if (importedIds.size) {
+      setRows(current => current.filter(row => !importedIds.has(row.id)))
+      setSelected(current => new Set([...current].filter(id => !importedIds.has(id))))
+      setExistingDocs(new Set()); setCheckedSelection('')
+    }
+    if (failure) {
+      setExistingDocs(new Set()); setCheckedSelection('')
+      setError(`${importedCount ? `${importedCount} cliente(s) importado(s); ` : ''}o restante não foi concluído: ${failure}`)
+      if (importedCount) setMessage('Os registros importados foram removidos da prévia. Confira os restantes e refaça a conferência antes de tentar novamente.')
+      return
+    }
+    setMessage(`${importedCount} cliente(s) importado(s) para a base histórica em lotes de até 25. Nenhum registro foi criado no funil.`)
   }
 
   return <div className="grid gap-5">
@@ -232,14 +297,14 @@ export function HistoricalCustomerImport({ products, schemaReady, productSchemaR
     </div>
 
     {(error || message) && <p role={error ? 'alert' : 'status'} className={`msg-base ${error ? 'msg-danger' : 'msg-success'}`}>{error || message}</p>}
-    {rows.length > 0 && <div className={panel}><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4"><div><h2 className="font-bold">Revisão: {fileName}</h2><p className="text-sm text-muted">{rows.length} linhas · {selectedRows.length} selecionadas · {duplicateRows} repetidas no arquivo</p></div><div className="flex flex-wrap gap-2"><button type="button" disabled={busy || !selectedRows.length} onClick={() => void checkDuplicates()} className="btn-base btn-secondary btn-sm">Verificar duplicidades no CRM</button><button type="button" disabled={busy || !schemaReady || !productSchemaReady || !selectedRows.length || selectedRows.length > 25 || checkedSelection !== selectionKey} onClick={() => void submitImport()} className="btn-base btn-primary btn-sm">{busy ? 'Processando…' : `Importar ${selectedRows.length} selecionados`}</button></div></div>
+    {rows.length > 0 && <div className={panel}><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4"><div><h2 className="font-bold">Revisão: {fileName}</h2><p className="text-sm text-muted">{rows.length} linhas · {selectedRows.length} selecionadas · {duplicateRows} repetidas no arquivo</p>{selectedRows.length > 25 && <p className="mt-1 text-xs text-blue-800">A seleção será importada em lotes automáticos de até 25 clientes.</p>}</div><div className="flex flex-wrap gap-2"><button type="button" disabled={busy || !selectedRows.length} onClick={() => void checkDuplicates()} className="btn-base btn-secondary btn-sm">Verificar duplicidades no CRM</button><button type="button" disabled={busy || !schemaReady || !productSchemaReady || !selectedRows.length || checkedSelection !== selectionKey} onClick={() => void submitImport()} className="btn-base btn-primary btn-sm">{busy ? 'Processando…' : `Importar ${selectedRows.length} selecionados`}</button></div></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-600"><tr>{['Sel.','Razão social / fantasia','CPF/CNPJ · status','Contato da planilha','Mensalidade','Produtos contratados','Consulta CNPJ / IE'].map(label => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead><tbody>{pageRows.map(row => {
         const taxInvalid = Boolean(row.taxId && !(row.kind === 'individual' ? validCpf(row.taxId) : validCnpj(row.taxId)))
         const duplicate = row.sourceDuplicate || Boolean(row.taxId && existingDocs.has(row.taxId))
         const invalidEmail = Boolean(row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email))
-        const selectedProductMissing = row.productCodes.some(code => !mapping[code])
-        const cannotSelect = !row.name || !row.status || taxInvalid || invalidEmail || duplicate || selectedProductMissing
-        return <tr key={row.id} className="border-t border-slate-100 align-top"><td className="px-3 py-3"><input type="checkbox" checked={selected.has(row.id)} disabled={cannotSelect || busy} onChange={() => toggleRow(row.id)} aria-label={`Selecionar ${row.name}`} /></td><td className="px-3 py-3"><strong>{row.name || 'Sem razão social'}</strong><span className="block text-xs text-muted">{row.tradeName || 'Sem nome fantasia'} · linha {row.rowNumber}</span>{row.enrichment && <button type="button" onClick={() => applyEnrichment(row.id)} className="mt-1 text-xs font-semibold text-blue hover:underline">Aplicar dados cadastrais do CNPJ</button>}</td><td className="px-3 py-3">{row.taxId || 'Documento ausente'}<span className="block text-xs text-muted">{row.status === 'active' ? 'Ativo' : row.status === 'inactive' ? 'Inativo' : 'Status inválido'}</span>{!row.taxId && <span className="block text-xs text-amber-800">Sem documento: seleção manual, sem conferência automática de duplicidade</span>}{taxInvalid && <span className="block text-xs text-red-700">Documento inválido</span>}{row.sourceDuplicate && <span className="block text-xs text-amber-800">Repetido no arquivo</span>}{row.taxId && existingDocs.has(row.taxId) && <span className="block text-xs text-amber-800">Já cadastrado no CRM</span>}</td><td className="px-3 py-3">{row.phone || '—'}<span className="block text-xs text-muted">WhatsApp: {row.whatsapp || '—'}</span><span className="block text-xs text-muted">{row.email || '—'}</span></td><td className="px-3 py-3">{row.monthlyFee == null ? '—' : row.monthlyFee.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}<span className="block text-xs text-muted">Venc.: {row.billingDay ? `dia ${row.billingDay}` : '—'}</span></td><td className="px-3 py-3">{row.productCodes.length ? row.productCodes.join(' + ') : 'Nenhum “SIM”'}{row.productCodes.some(code => !mapping[code]) && <span className="block text-xs text-amber-800">Associe os produtos no mapeamento acima.</span>}{row.unknownProducts.length > 0 && <span className="block text-xs text-amber-800">Revisar: {row.unknownProducts.join(', ')} (somente SIM é importado)</span>}{row.legacyContractStatus && <span className="block text-xs text-muted">Contrato legado: {row.legacyContractStatus}</span>}</td><td className="px-3 py-3"><button type="button" disabled={row.lookupBusy || !validCnpj(row.taxId)} onClick={() => void lookupRow(row.id)} className="btn-base btn-secondary btn-sm">{row.lookupBusy ? 'Consultando…' : 'Consultar CNPJ + IE'}</button>{row.lookupMessage && <span className="mt-1 block max-w-64 text-xs text-muted">{row.lookupMessage}</span>}{row.enrichment && <div className="mt-2 grid gap-1"><span className="text-xs text-muted">Sugestão: {row.enrichment.name || 'sem razão social'} · {row.enrichment.city || 'sem cidade'}/{row.enrichment.state || '—'}</span>{row.inscriptions.length > 1 ? <select aria-label="Selecionar Inscrição Estadual" className={`${input} mt-1`} value={row.stateRegistration} onChange={event => setRows(current => current.map(item => item.id === row.id ? { ...item, stateRegistration: event.target.value } : item))}><option value="">Escolher IE…</option>{row.inscriptions.map((item,index) => <option key={`${item.state}-${item.number}-${index}`} value={item.number}>{item.state ?? 'UF não informada'} · {item.number}{item.active === true ? ' · ativa' : item.active === false ? ' · inativa' : ''}</option>)}</select> : row.stateRegistration ? <span className="text-xs text-muted">IE: {row.stateRegistration}</span> : row.inscriptions.length === 1 ? <button type="button" onClick={() => setRows(current => current.map(item => item.id === row.id ? { ...item, stateRegistration: item.inscriptions[0]?.number ?? '' } : item))} className="text-left text-xs font-semibold text-blue">Usar IE {row.inscriptions[0].number}</button> : null}</div>}</td></tr>
+        const blockReasons = rowBlockReasons(row, existingDocs, mapping)
+        const cannotSelect = !row.name || !row.status || taxInvalid || invalidEmail || duplicate
+        return <tr key={row.id} className="border-t border-slate-100 align-top"><td className="px-3 py-3"><input type="checkbox" checked={selected.has(row.id)} disabled={cannotSelect || busy} onChange={() => toggleRow(row.id)} aria-label={`Selecionar ${row.name}`} /></td><td className="px-3 py-3"><strong>{row.name || 'Sem razão social'}</strong><span className="block text-xs text-muted">{row.tradeName || 'Sem nome fantasia'} · linha {row.rowNumber}</span>{row.enrichment && <button type="button" onClick={() => applyEnrichment(row.id)} className="mt-1 text-xs font-semibold text-blue hover:underline">Aplicar dados cadastrais do CNPJ</button>}{blockReasons.length > 0 && <ul className="mt-1 list-disc pl-4 text-xs text-red-700" aria-label="Motivos que impedem a importação">{blockReasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}{!selected.has(row.id) && !cannotSelect && <span className="mt-1 block text-xs text-muted">Não pré-selecionado; marque para incluir no lote.</span>}</td><td className="px-3 py-3">{row.taxId || 'Documento ausente'}<span className="block text-xs text-muted">{row.status === 'active' ? 'Ativo' : row.status === 'inactive' ? 'Inativo' : 'Status inválido'}</span>{!row.taxId && <span className="block text-xs text-amber-800">Sem documento: seleção manual, sem conferência automática de duplicidade</span>}{taxInvalid && <span className="block text-xs text-red-700">Documento inválido</span>}{row.sourceDuplicate && <span className="block text-xs text-amber-800">Repetido no arquivo</span>}{row.taxId && existingDocs.has(row.taxId) && <span className="block text-xs text-amber-800">Já cadastrado no CRM</span>}</td><td className="px-3 py-3">{row.phone || '—'}<span className="block text-xs text-muted">WhatsApp: {row.whatsapp || '—'}</span><span className="block text-xs text-muted">{row.email || '—'}</span></td><td className="px-3 py-3">{row.monthlyFee == null ? '—' : row.monthlyFee.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}<span className="block text-xs text-muted">Venc.: {row.billingDay ? `dia ${row.billingDay}` : '—'}</span></td><td className="px-3 py-3">{row.productCodes.length ? row.productCodes.join(' + ') : 'Nenhum “SIM”'}{row.productCodes.some(code => !mapping[code]) && <span className="block text-xs text-amber-800">Associe os produtos no mapeamento acima.</span>}{row.unknownProducts.length > 0 && <span className="block text-xs text-amber-800">Revisar: {row.unknownProducts.join(', ')} (somente SIM é importado)</span>}{row.legacyContractStatus && <span className="block text-xs text-muted">Contrato legado: {row.legacyContractStatus}</span>}</td><td className="px-3 py-3"><button type="button" disabled={row.lookupBusy || !validCnpj(row.taxId)} onClick={() => void lookupRow(row.id)} className="btn-base btn-secondary btn-sm">{row.lookupBusy ? 'Consultando…' : 'Consultar CNPJ + IE'}</button>{row.lookupMessage && <span className="mt-1 block max-w-64 text-xs text-muted">{row.lookupMessage}</span>}{row.enrichment && <div className="mt-2 grid gap-1"><span className="text-xs text-muted">Sugestão: {row.enrichment.name || 'sem razão social'} · {row.enrichment.city || '—'}/{row.enrichment.state || '—'}</span>{row.inscriptions.length > 1 ? <select aria-label="Selecionar Inscrição Estadual" className={`${input} mt-1`} value={row.stateRegistration} onChange={event => setRows(current => current.map(item => item.id === row.id ? { ...item, stateRegistration: event.target.value } : item))}><option value="">Escolher IE…</option>{row.inscriptions.map((item,index) => <option key={`${item.state}-${item.number}-${index}`} value={item.number}>{item.state ?? 'UF não informada'} · {item.number}{item.active === true ? ' · ativa' : item.active === false ? ' · inativa' : ''}</option>)}</select> : row.stateRegistration ? <span className="text-xs text-muted">IE: {row.stateRegistration}</span> : row.inscriptions.length === 1 ? <button type="button" onClick={() => setRows(current => current.map(item => item.id === row.id ? { ...item, stateRegistration: item.inscriptions[0]?.number ?? '' } : item))} className="text-left text-xs font-semibold text-blue">Usar IE {row.inscriptions[0].number}</button> : null}</div>}</td></tr>
       })}</tbody></table></div><div className="flex items-center justify-between gap-3 border-t border-slate-200 p-3 text-sm"><button disabled={page===0} onClick={()=>setPage(value=>Math.max(0,value-1))} className="btn-base btn-secondary btn-sm">Anterior</button><span className="text-muted">Página {page+1} de {Math.max(1,Math.ceil(rows.length/20))} · até 20 por página</span><button disabled={(page+1)*20>=rows.length} onClick={()=>setPage(value=>Math.min(Math.ceil(rows.length/20)-1,value+1))} className="btn-base btn-secondary btn-sm">Próxima</button></div>
       <div className="border-t border-slate-200 bg-slate-50 p-4 text-xs text-muted">Os dados de telefone, WhatsApp e e-mail são sempre os da planilha, mesmo após consulta. A coluna “CONTRATOS” é guardada como status legado de referência; nenhum contrato ou link Clicksign será criado. Mensalidade é armazenada como referência total, sem gerar cobrança.</div>
     </div>}
