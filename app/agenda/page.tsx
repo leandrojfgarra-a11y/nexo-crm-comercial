@@ -2,6 +2,7 @@ import { resolveAgendaContext } from '@/lib/agenda-context'
 import { applyAgendaReadScope, isAgendaAdministrator, scopeAgendaEvents } from '@/lib/agenda-security'
 import { hasAgendaSchema } from '@/lib/agenda-schema'
 import { AGENDA_EVENT_SELECT_COLUMNS, agendaDateKey, agendaPeriodBounds } from '@/lib/agenda-calendar-data'
+import { agendaCalendarInstanceKey } from '@/lib/agenda-modal-state'
 import Link from 'next/link'
 import AgendaCalendar from './agenda-calendar'
 
@@ -131,7 +132,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
         </p>
       )}
       <AgendaCalendar
-        key={`${view}-${selectedDay}`}
+        key={agendaCalendarInstanceKey(view, selectedDay, sp.new === '1' && schemaReady)}
         month={month}
         view={view as 'month' | 'week' | 'day'}
         selectedDay={selectedDay}
