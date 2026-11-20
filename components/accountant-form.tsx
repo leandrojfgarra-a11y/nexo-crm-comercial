@@ -22,7 +22,7 @@ type LookupState = { text: string; tone: 'info' | 'danger' | 'success' } | null
 
 function AccountantSubmitButton({ editing }: { editing: boolean }) {
   const { pending } = useFormStatus()
-  return <AppButton type="submit" loading={pending} loadingText="Salvando…" className="w-full sm:w-auto">{editing ? 'Salvar contabilidade' : 'Cadastrar contabilidade'}</AppButton>
+  return <AppButton type="submit" loading={pending} loadingText="Salvando…" startIcon={<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h12l3 3v13H4V4h1Z" /><path d="M8 4v6h8V4M8 20v-6h8v6" /></svg>} className="w-full sm:w-auto">{editing ? 'Salvar contabilidade' : 'Cadastrar contabilidade'}</AppButton>
 }
 
 export function AccountantForm({ initial = {}, detailsReady, relationshipReady }: { initial?: AccountantFormValues; detailsReady: boolean; relationshipReady: boolean }) {
@@ -121,7 +121,7 @@ export function AccountantForm({ initial = {}, detailsReady, relationshipReady }
         } />
         <FormField label={kind === 'office' ? 'Razão social' : 'Nome'} required className="sm:col-span-2 lg:col-span-5" control={<AppInput name="name" required minLength={2} defaultValue={initial.name ?? ''} aria-label={kind === 'office' ? 'Razão social' : 'Nome'} />} />
         <FormField label="Nome fantasia" hint="Nome fantasia do escritório (opcional)." className="lg:col-span-4" control={<AppInput name="trade_name" defaultValue={initial.trade_name ?? ''} disabled={!detailsReady} aria-label="Nome fantasia" />} />
-        <FormField label={kind === 'office' ? 'CNPJ' : 'CPF (opcional)'} required={kind === 'office'} className="lg:col-span-5" control={<AppInput name="tax_id" value={formatAccountantDocument(taxIdRaw, kind)} onChange={event => setTaxIdRaw(normalizeAccountantDocument(event.currentTarget.value, kind))} required={kind === 'office'} inputMode={kind === 'office' ? 'text' : 'numeric'} placeholder={kind === 'office' ? '00.000.000/0000-00' : '000.000.000-00'} aria-label={kind === 'office' ? 'CNPJ' : 'CPF opcional'} />} controlAddon={kind === 'office' ? <AppButton type="button" variant="secondary" size="sm" loading={lookingUpCnpj} loadingText="Consultando" onClick={lookupCnpj} className="shrink-0">Consultar CNPJ</AppButton> : undefined} />
+        <FormField label={kind === 'office' ? 'CNPJ' : 'CPF (opcional)'} required={kind === 'office'} className="lg:col-span-5" control={<AppInput name="tax_id" value={formatAccountantDocument(taxIdRaw, kind)} onChange={event => setTaxIdRaw(normalizeAccountantDocument(event.currentTarget.value, kind))} required={kind === 'office'} inputMode={kind === 'office' ? 'text' : 'numeric'} placeholder={kind === 'office' ? '00.000.000/0000-00' : '000.000.000-00'} aria-label={kind === 'office' ? 'CNPJ' : 'CPF opcional'} />} controlAddon={kind === 'office' ? <AppButton type="button" variant="secondary" size="sm" loading={lookingUpCnpj} loadingText="Consultando" onClick={lookupCnpj} startIcon={<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>} className="shrink-0">Consultar CNPJ</AppButton> : undefined} />
         <FormField label="Relacionamento comercial" className="lg:col-span-4" control={
           <AppSelect name="relationship_type" defaultValue={initial.relationship_type ?? (initial.id ? '' : 'lead')} disabled={!relationshipReady} aria-label="Relacionamento comercial">
             <option value="">Sem classificação</option><option value="lead">Lead de parceria</option><option value="partner">Parceiro</option>
@@ -164,7 +164,10 @@ export function AccountantForm({ initial = {}, detailsReady, relationshipReady }
       </FormSection>
 
       <FormActions>
-        <Link href="/contadores#cadastro" className="btn-base btn-secondary btn-md w-full sm:w-auto">Cancelar</Link>
+        <Link href="/contadores#cadastro" className="btn-base btn-secondary btn-md w-full sm:w-auto">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          Cancelar
+        </Link>
         <AccountantSubmitButton editing={Boolean(initial.id)} />
       </FormActions>
     </form>

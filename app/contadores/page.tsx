@@ -64,7 +64,10 @@ export default async function AccountantsPage({ searchParams }: { searchParams: 
           <h1 className={styles.pageTitle}>Contadores e escritórios</h1>
           <p className={styles.pageSubtitle}>Mantenha um cadastro centralizado e vincule a mesma contabilidade a vários clientes.</p>
         </div>
-        <Link href="#cadastro" className="btn-base btn-primary btn-sm">Nova contabilidade</Link>
+        <Link href="#cadastro" className="btn-base btn-primary btn-sm">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+          Nova contabilidade
+        </Link>
       </header>
 
       {params.notice && <p role={noticeIsSuccess ? 'status' : 'alert'} className={`${styles.notice} ${noticeIsSuccess ? styles.noticeSuccess : styles.noticeDanger}`}>{notices[params.notice] ?? params.notice}</p>}
@@ -89,6 +92,9 @@ export default async function AccountantsPage({ searchParams }: { searchParams: 
                   aria-current={relationship === view.id ? 'page' : undefined}
                   className={`btn-base btn-secondary btn-sm ${relationship === view.id ? 'bg-blue text-white border-blue' : 'border-transparent hover:bg-slate-50 text-ink'} ${!relationshipReady && view.id !== 'all' ? 'pointer-events-none opacity-50' : ''}`}
                 >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    {view.id === 'lead' ? <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></> : view.id === 'partner' ? <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="m16 11 2 2 4-4" /></> : view.id === 'unclassified' ? <><circle cx="12" cy="12" r="9" /><path d="M12 8v4m0 4h.01" /></> : <><circle cx="9" cy="7" r="4" /><path d="M2 21a7 7 0 0 1 14 0m1-9h5m-2.5-2.5v5" /></>}
+                  </svg>
                   {view.label}
                 </Link>
               ))}
@@ -146,9 +152,15 @@ export default async function AccountantsPage({ searchParams }: { searchParams: 
                           </td>
                           <td>
                             <div className="crm-action-group flex flex-wrap gap-1">
-                              <Link href={`/contadores?edit=${item.id}&relationship=${relationship}#cadastro`} className="btn-base btn-secondary btn-sm">Editar</Link>
+                              <Link href={`/contadores?edit=${item.id}&relationship=${relationship}#cadastro`} className="btn-base btn-secondary btn-sm">
+                                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m14 5 5 5M4 20l4.5-1 10-10a2.12 2.12 0 0 0-3-3l-10 10L4 20Z" /></svg>
+                                Editar
+                              </Link>
                               {whatsappHref ? (
-                                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" data-nexo-whatsapp-link="true" className="btn-base btn-success btn-sm">Abrir WhatsApp</a>
+                                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" data-nexo-whatsapp-link="true" className="btn-base btn-success btn-sm">
+                                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11.5a8.4 8.4 0 0 1-12.4 7.4L4 20l1.1-3.4A8.5 8.5 0 1 1 20 11.5Z" /><path d="M8.5 8.5c.3 2.2 2.8 4.7 5 5l1.2-1.2 2 1c-.2 1.5-1.2 2.2-2.5 2.2-3.4-.3-6.5-3.4-6.8-6.8 0-1.3.7-2.3 2.2-2.5l1 2-1.1 1.3Z" /></svg>
+                                  Abrir WhatsApp
+                                </a>
                               ) : (
                                 <span className="text-[11px] text-muted" title="Cadastre um telefone com DDD">Sem telefone válido</span>
                               )}

@@ -13,6 +13,7 @@ const formPath = path.resolve('components/accountant-form.tsx')
 const formSource = await readFile(formPath, 'utf8')
 const actionSource = await readFile(path.resolve('app/contadores/actions.ts'), 'utf8')
 const pageSource = await readFile(path.resolve('app/contadores/page.tsx'), 'utf8')
+const pageStyles = await readFile(path.resolve('app/contadores/accountants.module.css'), 'utf8')
 const compiled = ts.transpileModule(formSource, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -133,6 +134,22 @@ test('Contadores page does not rely on unpublished compact props or shared visua
   assert.doesNotMatch(pageSource, /<Panel\b|\bPanel,\s*table,\s*th,\s*td/)
   assert.match(pageSource, /import styles from '\.\/accountants\.module\.css'/)
   assert.doesNotMatch(pageSource, /var\(--(?:surface|border|text|primary|text-muted)/)
+})
+
+test('Contadores buttons use compact local styles, icons and accessible states', () => {
+  const html = render({ initial: { id: 'accountant-1', kind: 'office' }, detailsReady: true, relationshipReady: true })
+  assert.match(html, /Consultar CNPJ/)
+  assert.match(html, /Salvar contabilidade/)
+  assert.match(html, /Cancelar/)
+  assert.match(formSource, /startIcon=\{<svg/)
+  assert.match(pageSource, /Abrir WhatsApp/)
+  assert.match(pageStyles, /min-height: 33px/)
+  assert.match(pageStyles, /font-size: 12\.5px/)
+  assert.match(pageStyles, /padding: 0 11px/)
+  assert.match(pageStyles, /width: 14px/)
+  assert.match(pageStyles, /:focus-visible/)
+  assert.match(pageStyles, /:disabled/)
+  assert.match(pageStyles, /a\[aria-current='page'\]/)
 })
 
 test('submit action shows the saving state and disables repeat submission', () => {
