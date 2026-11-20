@@ -3,9 +3,13 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { safeSearchTerm } from '@/lib/crm-validation'
 import { PageHeader, Panel, table, th, td } from '@/components/ui'
 import { resolveTenantContext } from '@/lib/tenant/context'
+import { getCustomerPagination, parseCustomerPage } from '@/lib/customer-pagination'
 
-type SearchParams = Promise<{ q?: string; status?: string; notice?: string; customer?: string }>
+type SearchParamValue = string | string[] | undefined
+type SearchParams = Promise<{ q?: SearchParamValue; status?: SearchParamValue; page?: SearchParamValue; notice?: SearchParamValue; customer?: SearchParamValue }>
 type Person = { id: string; kind: string; name: string; trade_name: string | null; tax_id: string | null; email: string | null; phone: string | null; mobile_phone: string | null; whatsapp: string | null }
+type CustomerRow = { id: string; person_id: string; status: string; since: string; people: Person | Person[] | null }
+const firstSearchParam = (value: SearchParamValue) => Array.isArray(value) ? value[0] ?? '' : value ?? ''
 const phoneForWhatsApp = (value: string) => {
   let digits = value.replace(/\D/g, '')
   if (digits.length === 10 || digits.length === 11) digits = `55${digits}`
@@ -16,22 +20,35 @@ const statusColors: Record<string, string> = { active: 'bg-emerald-50 text-emera
 
 export default async function CustomersPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
-  const term = safeSearchTerm(params.q ?? '')
-  const status = ['active', 'inactive'].includes(params.status ?? '') ? params.status! : 'all'
+  const queryText = firstSearchParam(params.q)
+  const statusParam = firstSearchParam(params.status)
+  const noticeParam = firstSearchParam(params.notice)
+  const customerParam = firstSearchParam(params.customer)
+  const term = safeSearchTerm(queryText)
+  const status = ['active', 'inactive'].includes(statusParam) ? statusParam : 'all'
   const supabase = await createAdminClient()
   const { companyId } = await resolveTenantContext(supabase)
 
-  let peopleQuery = supabase.from('people').select('id,kind,name,trade_name,tax_id,email,phone,mobile_phone,whatsapp').eq('company_id', companyId)
-  if (term) peopleQuery = peopleQuery.or(`name.ilike.%${term}%,trade_name.ilike.%${term}%,tax_id.ilike.%${term}%,phone.ilike.%${term}%,whatsapp.ilike.%${term}%`)
-  const { data: people, error: peopleError } = await peopleQuery.limit(1000)
-  const personMap = new Map((people ?? []).map(person => [person.id, person as Person]))
-  let customerQuery = supabase.from('customers').select('id,person_id,status,since').eq('company_id', companyId).order('created_at', { ascending: false }).limit(500)
+  const searchFilter = term
+    ? `name.ilike.%${term}%,trade_name.ilike.%${term}%,tax_id.ilike.%${term}%,phone.ilike.%${term}%,mobile_phone.ilike.%${term}%,whatsapp.ilike.%${term}%`
+    : null
+  let countQuery = supabase.from('customers').select('id,people!inner(id)', { count: 'exact', head: true }).eq('company_id', companyId)
+  if (status !== 'all') countQuery = countQuery.eq('status', status)
+  if (searchFilter) countQuery = countQuery.or(searchFilter, { referencedTable: 'people' })
+  const { count, error: countError } = await countQuery
+
+  const totalCount = countError ? 0 : count ?? 0
+  const pagination = getCustomerPagination(parseCustomerPage(params.page), totalCount)
+  let customerQuery = supabase.from('customers')
+    .select('id,person_id,status,since,people!inner(id,kind,name,trade_name,tax_id,email,phone,mobile_phone,whatsapp)')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: false })
   if (status !== 'all') customerQuery = customerQuery.eq('status', status)
-  if (term) {
-    const ids = (people ?? []).map(person => person.id)
-    customerQuery = ids.length ? customerQuery.in('person_id', ids) : customerQuery.eq('person_id', '00000000-0000-0000-0000-000000000000')
-  }
-  const { data: customers, error: customerError } = await customerQuery
+  if (searchFilter) customerQuery = customerQuery.or(searchFilter, { referencedTable: 'people' })
+  const { data: customerData, error: customerError } = countError
+    ? { data: null, error: countError }
+    : await customerQuery.range(pagination.from, pagination.to)
+  const customers = (customerData ?? []) as unknown as CustomerRow[]
   const noticeText: Record<string, string> = {
     'customer-created': 'Cliente cadastrado. Confira a ficha 360°.',
     'customer-updated': 'Cadastro atualizado.',
@@ -39,19 +56,19 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
     'customer-updated-schema-pending': 'Cadastro atualizado com os campos disponíveis. Dados fiscais e vínculos seguem pendentes da migration complementar.',
     'lead-converted': 'Lead convertido em cliente.',
   }
-  const notice = params.notice ? noticeText[params.notice] ?? params.notice : null
-  const noticeIsSuccess = ['customer-created', 'customer-updated', 'customer-created-schema-pending', 'customer-updated-schema-pending', 'lead-converted'].includes(params.notice ?? '')
+  const notice = noticeParam ? noticeText[noticeParam] ?? noticeParam : null
+  const noticeIsSuccess = ['customer-created', 'customer-updated', 'customer-created-schema-pending', 'customer-updated-schema-pending', 'lead-converted'].includes(noticeParam)
 
   return (
     <div>
       <PageHeader eyebrow="Relacionamento" title="Clientes" subtitle="Pesquise e acompanhe os cadastros comerciais de pessoas físicas e jurídicas." action="Novo cliente" href="/clientes/novo" />
       <div className="-mt-3 mb-5 flex justify-end"><Link href="/clientes/importar" className="btn-base btn-secondary btn-sm">Importar clientes históricos</Link></div>
-      {notice && <p role={noticeIsSuccess ? 'status' : 'alert'} className={`msg-base mt-4 ${noticeIsSuccess ? 'msg-success' : 'msg-danger'}`}>{notice}{params.customer && <Link className="ml-2 font-semibold underline" href={`/clientes/${params.customer}`}>Abrir ficha 360°</Link>}</p>}
-      <Panel title="Clientes cadastrados" aside={`${customers?.length ?? 0} registros`}>
+      {notice && <p role={noticeIsSuccess ? 'status' : 'alert'} className={`msg-base mt-4 ${noticeIsSuccess ? 'msg-success' : 'msg-danger'}`}>{notice}{customerParam && <Link className="ml-2 font-semibold underline" href={`/clientes/${customerParam}`}>Abrir ficha 360°</Link>}</p>}
+      <Panel title="Clientes cadastrados" aside={countError ? 'Total indisponível' : `${totalCount} registros`}>
         <form method="get" className="grid gap-3 border-b border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="flex flex-col gap-1 text-sm font-medium text-ink sm:col-span-2 lg:col-span-2">
             Nome, CPF/CNPJ, telefone ou WhatsApp
-            <input name="q" defaultValue={params.q} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-blue focus:ring-2 focus:ring-blue/15" />
+            <input name="q" defaultValue={queryText} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-blue focus:ring-2 focus:ring-blue/15" />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-ink sm:col-span-1 lg:col-span-1">
             Situação
@@ -63,9 +80,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
           </label>
           <button className="self-end btn-base btn-primary btn-md">Pesquisar</button>
         </form>
-        {peopleError || customerError ? (
+        {customerError ? (
           <p role="alert" className="msg-base mt-4 msg-danger">Não foi possível carregar os clientes. Verifique a sessão administrativa e o schema.</p>
-        ) : !customers?.length ? (
+        ) : !customers.length ? (
           <p className="p-6 text-center text-sm text-muted">Nenhum cliente encontrado. Ajuste os filtros ou cadastre um novo cliente.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -75,7 +92,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
               </thead>
               <tbody>
                 {customers.map(customer => {
-                  const person = personMap.get(customer.person_id)
+                  const person = Array.isArray(customer.people) ? customer.people[0] : customer.people
                   if (!person) return null
                   const phone = phoneForWhatsApp(person.whatsapp || person.mobile_phone || person.phone || '')
                   const whatsappHref = phone ? `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(`Olá, ${person.trade_name || person.name}! Aqui é da Garra Automação. Podemos conversar?`)}` : null
@@ -107,7 +124,26 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
             </table>
           </div>
         )}
+        {!customerError && totalCount > 0 && (
+          <nav aria-label="Paginação de clientes" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 p-4 text-sm">
+            {pagination.page > 1 ? (
+              <Link href={pageHref(pagination.page - 1, term, status)} className="btn-base btn-secondary btn-sm">Anterior</Link>
+            ) : <span aria-disabled="true" className="btn-base btn-secondary btn-sm opacity-50">Anterior</span>}
+            <span className="text-center text-muted">Página {pagination.page} de {pagination.totalPages} · {pagination.firstRecord}–{pagination.lastRecord} de {totalCount}</span>
+            {pagination.page < pagination.totalPages ? (
+              <Link href={pageHref(pagination.page + 1, term, status)} className="btn-base btn-secondary btn-sm">Próxima</Link>
+            ) : <span aria-disabled="true" className="btn-base btn-secondary btn-sm opacity-50">Próxima</span>}
+          </nav>
+        )}
       </Panel>
     </div>
   )
+}
+
+function pageHref(page: number, term: string, status: string) {
+  const params = new URLSearchParams()
+  if (term) params.set('q', term)
+  if (status !== 'all') params.set('status', status)
+  params.set('page', String(page))
+  return `/clientes?${params.toString()}`
 }
