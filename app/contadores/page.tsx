@@ -1,13 +1,15 @@
 import Link from 'next/link'
 import { AccountantForm, type AccountantFormValues } from '@/components/accountant-form'
-import { PageHeader, Panel, table, th, td } from '@/components/ui'
+import { PageHeader } from '@/components/ui'
 import { hasAccountantRelationshipSchema, hasCompleteAccountantSchema } from '@/lib/customer-schema'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { messageForAccountantRelationship } from '@/lib/whatsapp-messages'
 import { resolveTenantContext, TenantContextError } from '@/lib/tenant/context'
+import { formatAccountantDocument } from '@/lib/accountant-documents'
+import styles from './accountants.module.css'
 
 type Params = Promise<{ edit?: string; notice?: string; relationship?: string }>
-const notices: Record<string, string> = { created: 'Contabilidade cadastrada.', updated: 'Cadastro da contabilidade atualizado.', 'not-found': 'A contabilidade não existe ou não pertence a esta empresa.', invalid: 'Confira o tipo e o nome informado.', 'tax-invalid': 'CPF/CNPJ inválido.', 'email-invalid': 'E-mail inválido.', duplicate: 'Já existe uma contabilidade cadastrada com este documento.', 'save-error': 'Não foi possível salvar. Confira o schema e as políticas administrativas.' }
+const notices: Record<string, string> = { created: 'Contabilidade cadastrada.', updated: 'Cadastro da contabilidade atualizado.', 'not-found': 'A contabilidade não existe ou não pertence a esta empresa.', invalid: 'Confira o tipo e o nome informado.', 'tax-required': 'CNPJ obrigatório para pessoa jurídica.', 'tax-invalid': 'CPF/CNPJ inválido.', 'email-invalid': 'E-mail inválido.', duplicate: 'Já existe uma contabilidade cadastrada com este documento.', 'save-error': 'Não foi possível salvar. Confira o schema e as políticas administrativas.' }
 const phoneForWhatsApp = (value: string) => {
   let digits = value.replace(/\D/g, '')
   if (digits.length === 10 || digits.length === 11) digits = `55${digits}`
@@ -17,6 +19,7 @@ const accountantPhone = (item: AccountantFormValues) => [item.whatsapp, item.mob
 
 export default async function AccountantsPage({ searchParams }: { searchParams: Params }) {
   const params = await searchParams
+  const noticeIsSuccess = params.notice === 'created' || params.notice === 'updated'
   const supabase = await createAdminClient()
   let tenant: Awaited<ReturnType<typeof resolveTenantContext>>
   try {
@@ -24,7 +27,7 @@ export default async function AccountantsPage({ searchParams }: { searchParams: 
   } catch (error) {
     if (!(error instanceof TenantContextError)) throw error
     return (
-      <div>
+      <div className={styles.page}>
         <PageHeader
           eyebrow="Relacionamento"
           title="Contadores e escritórios"
@@ -54,24 +57,29 @@ export default async function AccountantsPage({ searchParams }: { searchParams: 
   const unclassifiedCount = allAccountants.filter(item => !item.relationship_type).length
 
   return (
-    <div>
-      <PageHeader
-        eyebrow="Relacionamento"
-        title="Contadores e escritórios"
-        subtitle="Mantenha um cadastro centralizado e vincule a mesma contabilidade a vários clientes."
-        action="Nova contabilidade"
-        href="#cadastro"
-      />
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
+        <div>
+          <p className={styles.eyebrow}>Relacionamento</p>
+          <h1 className={styles.pageTitle}>Contadores e escritórios</h1>
+          <p className={styles.pageSubtitle}>Mantenha um cadastro centralizado e vincule a mesma contabilidade a vários clientes.</p>
+        </div>
+        <Link href="#cadastro" className="btn-base btn-primary btn-sm">Nova contabilidade</Link>
+      </header>
 
-      {params.notice && <p role="status" className="msg-base mt-4 msg-success">{notices[params.notice] ?? params.notice}</p>}
-      {error && <p role="alert" className="msg-base mt-4 msg-danger">Cadastro de contabilidades indisponível. Confirme a migration inicial e as permissões administrativas.</p>}
-      {!detailsReady && <p className="msg-base mt-4 msg-warning">Campos de contato e endereço completo aguardam a migration complementar local. Nenhum SQL foi executado.</p>}
-      {!relationshipReady && <p className="msg-base mt-4 msg-warning">As abas Leads e Parceiros e as mensagens por relacionamento serão liberadas após aplicar manualmente a migration de classificação. Os cadastros existentes permanecem preservados.</p>}
+      {params.notice && <p role={noticeIsSuccess ? 'status' : 'alert'} className={`${styles.notice} ${noticeIsSuccess ? styles.noticeSuccess : styles.noticeDanger}`}>{notices[params.notice] ?? params.notice}</p>}
+      {error && <p role="alert" className={`${styles.notice} ${styles.noticeDanger}`}>Cadastro de contabilidades indisponível. Confirme a migration inicial e as permissões administrativas.</p>}
+      {!detailsReady && <p className={`${styles.notice} ${styles.noticeWarning}`}>Campos de contato e endereço completo aguardam a migration complementar local. Nenhum SQL foi executado.</p>}
+      {!relationshipReady && <p className={`${styles.notice} ${styles.noticeWarning}`}>As abas Leads e Parceiros e as mensagens por relacionamento serão liberadas após aplicar manualmente a migration de classificação. Os cadastros existentes permanecem preservados.</p>}
 
       {!error && (
         <>
-          <Panel title="Contabilidades cadastradas" aside={`${accountants.length} registros`}>
-            <nav aria-label="Filtrar contabilidades por relacionamento" className="flex flex-wrap gap-2 border-b border-slate-200 p-4 sm:grid-cols-4">
+          <section className={styles.panel}>
+            <div className={styles.panelHeader}>
+              <h2>Contabilidades cadastradas</h2>
+              <span>{accountants.length} registros</span>
+            </div>
+            <nav aria-label="Filtrar contabilidades por relacionamento" className={styles.filters}>
               {[
                 { id: 'lead', label: `Leads (${leadCount})` }, { id: 'partner', label: `Parceiros (${partnerCount})` }, { id: 'unclassified', label: `Sem classificação (${unclassifiedCount})` }, { id: 'all', label: `Todos (${allAccountants.length})` },
               ].map(view => (
@@ -87,12 +95,23 @@ export default async function AccountantsPage({ searchParams }: { searchParams: 
             </nav>
 
             {!accountants.length ? (
-              <p className="p-6 text-center text-sm text-muted">Nenhuma contabilidade nesta aba.</p>
+              <div className="px-4 py-6 text-center">
+                <div className={styles.emptyIcon}>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                </div>
+                <p className="text-xs font-medium text-ink">{allAccountants.length === 0 ? 'Nenhuma contabilidade cadastrada.' : 'Nenhuma contabilidade nesta aba.'}</p>
+                <p className="mt-0.5 text-[11px] text-muted">{allAccountants.length === 0 ? 'Cadastre um contador ou escritório para começar.' : 'Não há registros para o filtro selecionado.'}</p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className={`${table} w-full min-w-[1000px]`}>
+                <table className={styles.table}>
                   <thead>
-                    <tr>{['Contador / escritório','Contato responsável','CPF/CNPJ','Telefone / WhatsApp','E-mail','Relacionamento','Situação','Ações'].map(name => <th key={name} className={th}>{name}</th>)}</tr>
+                    <tr>{['Contador / escritório','Documento','Contato','Relacionamento','Situação','Ações'].map(name => <th key={name}>{name}</th>)}</tr>
                   </thead>
                   <tbody>
                     {accountants.map(item => {
@@ -102,28 +121,38 @@ export default async function AccountantsPage({ searchParams }: { searchParams: 
                       const whatsappHref = phone ? `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}` : null
                       const relationshipName = item.relationship_type === 'partner' ? 'Parceiro' : item.relationship_type === 'lead' ? 'Lead' : 'Sem classificação'
                       return (
-                        <tr key={item.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
-                          <td className={`${td} font-semibold`}>
-                            {item.name}
-                            {item.trade_name && <span className="block text-xs font-normal text-muted">{item.trade_name}</span>}
+                        <tr key={item.id}>
+                          <td className={styles.nameCell}>
+                            <span className="text-[13px]">{item.name}</span>
+                            {item.trade_name && <span className="block text-[11px] font-normal text-muted">{item.trade_name}</span>}
+                            <span className="mt-0.5 block text-[10px] font-normal text-muted">{item.kind === 'office' ? 'Pessoa jurídica · escritório' : 'Pessoa física · contador individual'}</span>
                           </td>
-                          <td className={td}>{item.contact_name ?? '—'}</td>
-                          <td className={td}>{item.tax_id ?? '—'}</td>
-                          <td className={td}>{[item.phone, item.mobile_phone, item.whatsapp].filter(Boolean).join(' · ') || '—'}</td>
-                          <td className={td}>{item.email ?? '—'}</td>
-                          <td className={td}>
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.relationship_type === 'partner' ? 'bg-blue-50 text-blue-800' : item.relationship_type === 'lead' ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>{relationshipName}</span>
+                          <td className={styles.documentCell}>{formatAccountantDocument(item.tax_id, item.kind) || '—'}</td>
+                          <td className={styles.contactCell}>
+                            <div className="space-y-0.5 text-xs">
+                              {item.contact_name && <span className="block font-medium">{item.contact_name}</span>}
+                              {item.phone && <span className="block whitespace-nowrap">Telefone: {item.phone}</span>}
+                              {item.mobile_phone && <span className="block whitespace-nowrap">Celular: {item.mobile_phone}</span>}
+                              {item.whatsapp && <span className="block whitespace-nowrap">WhatsApp: {item.whatsapp}</span>}
+                              {item.email && <span className="block break-all">{item.email}</span>}
+                              {!item.contact_name && !item.phone && !item.mobile_phone && !item.whatsapp && !item.email && <span className="text-muted">—</span>}
+                            </div>
                           </td>
-                          <td className={td}>
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.active ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>{item.active ? 'Ativo' : 'Inativo'}</span>
+                          <td>
+                            <span className={`badge ${item.relationship_type === 'partner' ? 'badge-info' : item.relationship_type === 'lead' ? 'badge-success' : 'badge-neutral'}`}>{relationshipName}</span>
                           </td>
-                          <td className={`${td} crm-action-group`}>
-                            <Link href={`/contadores?edit=${item.id}&relationship=${relationship}#cadastro`} className="btn-base btn-secondary btn-sm">Editar</Link>
-                            {whatsappHref ? (
-                              <a href={whatsappHref} target="_blank" rel="noopener noreferrer" data-nexo-whatsapp-link="true" className="btn-base btn-success btn-sm">Abrir WhatsApp</a>
-                            ) : (
-                              <span className="text-xs text-muted" title="Cadastre um telefone com DDD">Sem telefone válido</span>
-                            )}
+                          <td>
+                            <span className={`badge ${item.active ? 'badge-success' : 'badge-neutral'}`}>{item.active ? 'Ativo' : 'Inativo'}</span>
+                          </td>
+                          <td>
+                            <div className="crm-action-group flex flex-wrap gap-1">
+                              <Link href={`/contadores?edit=${item.id}&relationship=${relationship}#cadastro`} className="btn-base btn-secondary btn-sm">Editar</Link>
+                              {whatsappHref ? (
+                                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" data-nexo-whatsapp-link="true" className="btn-base btn-success btn-sm">Abrir WhatsApp</a>
+                              ) : (
+                                <span className="text-[11px] text-muted" title="Cadastre um telefone com DDD">Sem telefone válido</span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       )
@@ -132,14 +161,14 @@ export default async function AccountantsPage({ searchParams }: { searchParams: 
                 </table>
               </div>
             )}
-          </Panel>
+          </section>
 
-          <section id="cadastro" className="mt-6 card-base p-5">
-            <PageHeader
-              eyebrow="Cadastro central"
-              title={editing ? 'Editar contabilidade' : 'Nova contabilidade'}
-              subtitle={initial?.name ?? 'Cadastre o profissional ou escritório contábil.'}
-            />
+          <section id="cadastro" className={`${styles.formPanel} mt-3`}>
+            <header className={styles.formHeader}>
+              <p className={styles.eyebrow}>Cadastro central</p>
+              <h2>{editing ? 'Editar contabilidade' : 'Nova contabilidade'}</h2>
+              <p>{initial?.name ?? 'Cadastre o profissional ou escritório contábil.'}</p>
+            </header>
             <AccountantForm initial={initial ?? {}} detailsReady={detailsReady} relationshipReady={relationshipReady} />
           </section>
         </>

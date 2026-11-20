@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { validCnpj } from '@/lib/crm-validation'
 import { mergeMissingFields, normalizeCnpj, normalizeCnpjWs } from '@/lib/cnpj-normalization'
+import { classifyCnpjLookupFailure } from '@/lib/cnpj-lookup-failure'
 import { createClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
+export const maxDuration = 30
 
 type Provider = 'BrasilAPI' | 'Minha Receita' | 'CNPJ.ws'
 type ProviderResult = { provider: Provider; status: number | null; data?: Record<string, unknown>; error?: string }
@@ -87,6 +89,6 @@ export async function GET(request: Request) {
     ...(ieLookupError ? { ie_lookup_error: ieLookupError } : {}),
   }, { headers: { 'Cache-Control': 'no-store' } })
 
-  const summary = (result: ProviderResult) => result.provider + ': ' + (result.error || ('HTTP ' + (result.status ?? 'sem resposta')))
-  return NextResponse.json({ error: 'Consulta indispon?vel nas fontes p?blicas. ' + results.map(summary).join('; ') + '.' }, { status: 503 })
+  const failure = classifyCnpjLookupFailure(results)
+  return NextResponse.json({ error: failure.error }, { status: failure.status })
 }

@@ -1,18 +1,28 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import { digits, validCpf, validCnpj } from '@/lib/crm-validation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { hasAccountantRelationshipSchema, hasCompleteAccountantSchema } from '@/lib/customer-schema'
 import { resolveTenantContext } from '@/lib/tenant/context'
+import { parseAccountantIdentity } from '@/lib/accountant-identity'
+import { updateAccountantForCompany } from '@/lib/accountant-update'
 
 export async function saveAccountant(formData: FormData) {
   const supabase = await createAdminClient()
   const tenant = await resolveTenantContext(supabase)
-  const kind = String(formData.get('kind') ?? 'individual')
-  const name = String(formData.get('name') ?? '').trim()
-  const taxIdInput = String(formData.get('tax_id') ?? '').trim().toUpperCase()
-  const taxId = taxIdInput ? (kind === 'individual' ? digits(taxIdInput) : taxIdInput.replace(/[.\/-]/g, '')) : null
+  const identity = parseAccountantIdentity(
+    String(formData.get('kind') ?? ''),
+    String(formData.get('name') ?? ''),
+    String(formData.get('tax_id') ?? ''),
+  )
+  if ('error' in identity) {
+    if (identity.error === 'tax-required') redirect('/contadores?notice=tax-required')
+    if (identity.error === 'tax-invalid') redirect('/contadores?notice=tax-invalid')
+    redirect('/contadores?notice=invalid')
+  }
+  const { kind, name, taxId } = identity.value
   const email = String(formData.get('email') ?? '').trim().toLowerCase() || null
   const phone = String(formData.get('phone') ?? '').trim() || null
   const notes = String(formData.get('notes') ?? '').trim() || null
@@ -20,8 +30,6 @@ export async function saveAccountant(formData: FormData) {
   const active = String(formData.get('active') ?? 'true') === 'true'
   const relationshipType = String(formData.get('relationship_type') ?? (id ? '' : 'lead'))
   if (relationshipType && !['lead', 'partner'].includes(relationshipType)) redirect('/contadores?notice=invalid')
-  if (!['individual', 'office'].includes(kind) || name.length < 2) redirect('/contadores?notice=invalid')
-  if (taxId && !(kind === 'individual' ? validCpf(taxId) : validCnpj(taxId))) redirect('/contadores?notice=tax-invalid')
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) redirect('/contadores?notice=email-invalid')
   const payload: Record<string, string | boolean | null> = { company_id: tenant.companyId, kind, name, tax_id: taxId, email, phone, notes, active }
   if (await hasCompleteAccountantSchema(supabase)) Object.assign(payload, {
@@ -39,14 +47,16 @@ export async function saveAccountant(formData: FormData) {
   })
   if (await hasAccountantRelationshipSchema(supabase)) payload.relationship_type = relationshipType || null
   if (id) {
-    const { data, error } = await supabase.from('accountants').update(payload)
-      .eq('id', id).eq('company_id', tenant.companyId).select('id').maybeSingle()
-    if (error) redirect(`/contadores?notice=${error.code === '23505' ? 'duplicate' : 'save-error'}`)
-    if (!data) redirect('/contadores?notice=not-found')
+    const result = await updateAccountantForCompany(supabase, id, tenant.companyId, payload)
+    if (result.status === 'duplicate') redirect('/contadores?notice=duplicate')
+    if (result.status === 'error') redirect('/contadores?notice=save-error')
+    if (result.status === 'not-found') redirect('/contadores?notice=not-found')
+    revalidatePath('/contadores')
     redirect('/contadores?notice=updated')
   }
   const { error } = await supabase.from('accountants').insert(payload)
   if (error) redirect(`/contadores?notice=${error.code === '23505' ? 'duplicate' : 'save-error'}`)
+  revalidatePath('/contadores')
   redirect('/contadores?notice=created')
 }
 

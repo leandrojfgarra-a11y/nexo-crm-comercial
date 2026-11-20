@@ -1,0 +1,23 @@
+.scope {
+  --surface: var(--color-surface, #ffffff);
+  --surface-raised: #f8fafc;
+  --surface-hover: #f1f6fc;
+  --text: var(--color-ink, #172334);
+  --text-muted: var(--color-muted, #718096);
+  --border: #d9e2ec;
+  --border-strong: #b8c8dc;
+  --primary: var(--color-blue, #2878d0);
+  color: var(--text);
+}
+
+:global(.dark-theme) .scope {
+  --surface: #141f30;
+  --surface-raised: #1b293c;
+  --surface-hover: #1f3149;
+  --text: #e8eef8;
+  --text-muted: #a5b4c9;
+  --border: #2a3b51;
+  --border-strong: #43556d;
+  --primary: #56a2ff;
+  color-scheme: dark;
+}
