@@ -1,0 +1,112 @@
+.root {
+  --surface: var(--color-surface, #ffffff);
+  --surface-raised: #f8fafc;
+  --surface-hover: #f1f5f9;
+  --text: var(--color-ink, #172334);
+  --text-muted: var(--color-muted, #718096);
+  --border: #d9e2ec;
+  --input-bg: #ffffff;
+  --input-border: #b8c8dc;
+  --input-border-hover: #8da8c8;
+  --input-disabled-bg: #f2f5f9;
+  --input-disabled-text: #64748b;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.root label { font-size: 0.8125rem; }
+
+.filters {
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: var(--surface-raised);
+  padding: 0.75rem;
+}
+
+.field {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.root input:not([type="checkbox"]):not([type="radio"]),
+.root select,
+.root textarea {
+  border-color: var(--input-border);
+  background-color: var(--input-bg);
+  color: var(--text);
+}
+
+.root input:not([type="checkbox"]):not([type="radio"]):hover,
+.root select:hover,
+.root textarea:hover { border-color: var(--input-border-hover); }
+
+.root input:disabled,
+.root select:disabled,
+.root textarea:disabled {
+  background: var(--input-disabled-bg);
+  color: var(--input-disabled-text);
+}
+
+.formSection {
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: var(--surface);
+  padding: 0.875rem;
+}
+
+.formSectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.formSectionTitle { margin: 0; color: var(--text); font-size: 0.875rem; font-weight: 650; }
+.formSectionDescription { margin: 0.125rem 0 0; color: var(--text-muted); font-size: 0.75rem; line-height: 1.4; }
+.choiceCard { display: grid; align-content: start; gap: 0.5rem; min-width: 0; }
+.segmented { display: inline-flex; flex-wrap: wrap; gap: 0.125rem; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.125rem; }
+.modalBackdrop { color-scheme: light; }
+.modal { border-color: var(--border); background: var(--surface); }
+.modalHeader, .modalFooter { border-color: var(--border); background: var(--surface); }
+.modalBody { overscroll-behavior: contain; }
+
+.root [class*="border-slate-"] { border-color: var(--border); }
+.root [class~="text-slate-500"],
+.root [class~="text-slate-600"],
+.root [class~="text-slate-400"] { color: var(--text-muted); }
+.root [class~="hover:bg-slate-50"]:hover { background-color: var(--surface-hover); }
+
+:global(.dark-theme) .root {
+  --surface: #141f30;
+  --surface-raised: #1b293c;
+  --surface-hover: #1b2b41;
+  --text: #e8eef8;
+  --text-muted: #a5b4c9;
+  --border: #2a3b51;
+  --input-bg: #101a29;
+  --input-border: #43556d;
+  --input-border-hover: #5a7394;
+  --input-disabled-bg: #1b293c;
+  --input-disabled-text: #91a1b5;
+}
+
+:global(.dark-theme) .modalBackdrop { color-scheme: dark; }
+:global(.dark-theme) .root [class~="bg-white"] { background-color: var(--surface) !important; }
+:global(.dark-theme) .root [class~="bg-slate-50"],
+:global(.dark-theme) .root [class~="bg-slate-100"] { background-color: var(--surface-raised) !important; }
+:global(.dark-theme) .root [class~="bg-blue-50"] { background-color: #17375c !important; }
+:global(.dark-theme) .root :global(.btn-secondary) { border-color: #43556d; background: #1a2a3f; color: #e8eef8 !important; }
+:global(.dark-theme) .root :global(.btn-secondary:hover) { border-color: #56a2ff; background: #213753; color: #ffffff !important; }
+
+@media (max-width: 639px) {
+  .formSection { padding: 0.75rem; }
+  .root .modal { width: 100%; }
+}

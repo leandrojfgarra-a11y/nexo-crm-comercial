@@ -7,7 +7,7 @@ import { signOut } from '@/app/login/actions'
 
 const nav = [
   { title: 'VISÃO GERAL', links: [['Painel', '/'], ['Funil de vendas', '/funil']] },
-  { title: 'RELACIONAMENTO', links: [['Clientes', '/clientes'], ['Leads', '/leads'], ['WhatsApp', '/whatsapp'], ['E-mail', '/email'], ['Contadores', '/contadores'], ['Oportunidades', '/oportunidades']] },
+  { title: 'RELACIONAMENTO', links: [['Clientes', '/clientes'], ['Leads', '/leads'], ['Agenda', '/agenda'], ['WhatsApp', '/whatsapp'], ['E-mail', '/email'], ['Contadores', '/contadores'], ['Oportunidades', '/oportunidades']] },
   { title: 'COMERCIAL', links: [['Propostas', '/propostas'], ['Contratos', '/contratos'], ['Produtos e serviços', '/produtos'], ['Vendedores', '/vendedores'], ['Metas comerciais', '/metas'], ['Comissões', '/comissoes']] },
   { title: 'ADMINISTRAÇÃO', links: [['Usuários da equipe', '/usuarios']] },
 ]
