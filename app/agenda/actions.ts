@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { resolveAgendaContext } from '@/lib/agenda-context'
 import { canManageAgendaEvent, isAgendaAdministrator, isAllowedAgendaStatusTransition, isValidAgendaInterval, resolveAgendaAssignee } from '@/lib/agenda-security'
 import { hasAgendaSchema } from '@/lib/agenda-schema'
+import { agendaDateTimeToIso, buildAgendaEventPayload } from '@/lib/agenda-calendar-data'
 
 const agendaPath = '/agenda'
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -14,6 +15,14 @@ function notice(value: string): never {
 }
 
 const fail = (message: string): never => redirect(`${agendaPath}?action_error=${encodeURIComponent(message)}`)
+
+function parseAgendaDateTime(date: string, time: string): Date {
+  try {
+    return new Date(agendaDateTimeToIso(date, time))
+  } catch {
+    return fail('Data ou horário inválido.')
+  }
+}
 
 export type AgendaEventResult = { ok: boolean; message: string; eventId?: string }
 
@@ -75,8 +84,8 @@ export async function saveAgendaEvent(formData: FormData): Promise<AgendaEventRe
   if (!/^[0-9]{2}:[0-9]{2}$/.test(endsAtTime)) {
     fail('Informe um horário final válido.')
   }
-  const startDateTime = new Date(`${startsAtDate}T${startsAtTime}:00-03:00`)
-  const endDateTime = new Date(`${endsAtDate}T${endsAtTime}:00-03:00`)
+  const startDateTime = parseAgendaDateTime(startsAtDate, startsAtTime)
+  const endDateTime = parseAgendaDateTime(endsAtDate, endsAtTime)
   if (Number.isNaN(startDateTime.getTime()) || Number.isNaN(endDateTime.getTime())) {
     fail('Data ou horário inválido.')
   }
@@ -185,7 +194,7 @@ export async function saveAgendaEvent(formData: FormData): Promise<AgendaEventRe
     }
   }
 
-  const payload = {
+  const payload = buildAgendaEventPayload({
     company_id: companyId,
     title,
     description,
@@ -202,7 +211,7 @@ export async function saveAgendaEvent(formData: FormData): Promise<AgendaEventRe
     assigned_user_id: assignedUserIdFinal,
     status,
     color,
-  }
+  })
 
   if (id) {
     const { error } = await supabase.from('agenda_events').update(payload).eq('id', id).eq('company_id', companyId)

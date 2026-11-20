@@ -4,25 +4,9 @@ import { FormEvent, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveAgendaEvent, deleteAgendaEvent, setAgendaEventStatus } from './actions'
 import styles from './agenda-calendar.module.css'
+import { agendaDateKey, agendaWeekDays, filterAgendaEvents, type AgendaCalendarEvent } from '@/lib/agenda-calendar-data'
 
-type Event = {
-  id: string
-  title: string
-  description: string | null
-  event_type: string
-  starts_at: string
-  ends_at: string
-  all_day: boolean
-  contact_id: string | null
-  contact_name_manual: string | null
-  contact_phone_manual: string | null
-  service_id: string | null
-  service_name_manual: string | null
-  service_description_manual: string | null
-  assigned_user_id: string | null
-  status: string
-  color: string | null
-}
+type Event = AgendaCalendarEvent
 type ContactOption = { id: string; name: string; phone: string | null }
 type Option = { id: string; name: string }
 type Member = { user_id: string; full_name: string; email: string }
@@ -65,7 +49,7 @@ function parts(value: string | Date) {
   const get = (t: string) => p.find((x) => x.type === t)?.value ?? ''
   return { date: `${get('year')}-${get('month')}-${get('day')}`, time: `${get('hour')}:${get('minute')}` }
 }
-const dateKey = (value: string | Date) => parts(value).date
+const dateKey = agendaDateKey
 const clock = (value: string) => parts(value).time
 const monthLabel = (m: string) => new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: zone }).format(new Date(`${m}-15T12:00:00-03:00`))
 const dayLabel = (d: string) => new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: zone }).format(new Date(`${d}T12:00:00-03:00`))
@@ -114,27 +98,17 @@ export default function AgendaCalendar(props: Props) {
   const [assignedFilter, setAssignedFilter] = useState('all')
   const [contactFilter, setContactFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [formMessage, setFormMessage] = useState('')
 
   const canEditEvent = (e: Event) => (canEdit && isAdminOrOwner) || e.assigned_user_id === userId
   const canDeleteEvent = (e: Event) => (canDelete && isAdminOrOwner) || e.assigned_user_id === userId
   const message = saved === 'created' ? 'Compromisso criado com sucesso.' : saved === 'updated' ? 'Compromisso atualizado com sucesso.' : saved === 'completed' ? 'Compromisso concluído.' : saved === 'cancelled' ? 'Compromisso cancelado.' : saved === 'reopened' ? 'Compromisso reaberto.' : saved === 'deleted' ? 'Compromisso excluído.' : undefined
-  const normalizedSearch = search.trim().toLocaleLowerCase('pt-BR')
-  const filteredEvents = useMemo(() => events.filter((event) =>
-    (statusFilter === 'all' || event.status === statusFilter) &&
-    (assignedFilter === 'all' || (assignedFilter === 'unassigned' ? !event.assigned_user_id : event.assigned_user_id === assignedFilter)) &&
-    (contactFilter === 'all' || event.contact_id === contactFilter) &&
-    (!normalizedSearch || [
-      event.title,
-      event.description,
-      event.contact_name_manual,
-      event.contact_phone_manual,
-      event.service_name_manual,
-      event.service_description_manual,
-      contacts.find((contact) => contact.id === event.contact_id)?.name,
-      contacts.find((contact) => contact.id === event.contact_id)?.phone,
-      services.find((service) => service.id === event.service_id)?.name,
-    ].some((value) => value?.toLocaleLowerCase('pt-BR').includes(normalizedSearch)))
-  ), [assignedFilter, contactFilter, contacts, events, normalizedSearch, services, statusFilter])
+  const filteredEvents = useMemo(() => filterAgendaEvents(events, {
+    status: statusFilter,
+    assignedUserId: assignedFilter,
+    contactId: contactFilter,
+    search,
+  }, contacts, services), [assignedFilter, contactFilter, contacts, events, search, services, statusFilter])
   const grouped = useMemo(() => filteredEvents.reduce<Record<string, Event[]>>((a, e) => { (a[dateKey(e.starts_at)] ??= []).push(e); return a }, {}), [filteredEvents])
 
   const addDays = (day: string, n: number) => { const d = new Date(`${day}T12:00:00-03:00`); d.setDate(d.getDate() + n); return parts(d).date }
@@ -184,8 +158,8 @@ export default function AgendaCalendar(props: Props) {
   const contactFor = (e: Event) => e.contact_id ? contacts.find((x) => x.id === e.contact_id) : undefined
   const serviceFor = (e: Event) => e.service_id ? services.find((x) => x.id === e.service_id) : undefined
 
-  const weekStart = useMemo(() => { const d = new Date(`${selected}T12:00:00-03:00`); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return dateKey(d) }, [selected])
-  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => { const d = new Date(`${weekStart}T12:00:00-03:00`); d.setUTCDate(d.getUTCDate() + i); return dateKey(d) }), [weekStart])
+  const weekDays = useMemo(() => agendaWeekDays(selected), [selected])
+  const weekStart = weekDays[0]
   const eventsByDay = grouped
   const dayEvents = useMemo(() => (eventsByDay[selected] ?? []).slice().sort((a, b) => a.starts_at.localeCompare(b.starts_at)), [eventsByDay, selected])
   const metricValue = (value: number | null) => value === null ? '—' : value.toLocaleString('pt-BR')
@@ -220,6 +194,7 @@ export default function AgendaCalendar(props: Props) {
 
       {error && <p role="alert" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{error}</p>}
       {message && <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{message}</p>}
+      {formMessage && <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{formMessage}</p>}
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
       <div className="min-w-0 space-y-3">
@@ -346,7 +321,7 @@ export default function AgendaCalendar(props: Props) {
               <div><p className="text-[10px] font-semibold uppercase tracking-[.12em] text-blue">{editing ? 'Editar' : 'Novo agendamento'}</p><h2 id="agenda-dialog-title" className="text-lg font-bold text-ink">{editing ? 'Editar compromisso' : 'Novo compromisso'}</h2></div>
               <button type="button" onClick={closeForm} aria-label="Fechar formulário" className="btn-base btn-secondary btn-sm">Fechar</button>
             </div>
-            <form key={editing?.id ?? `new-${selected}`} action={async (fd) => { await saveAgendaEvent(fd) }} onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+            <form key={editing?.id ?? `new-${selected}`} action={async (fd) => { const result = await saveAgendaEvent(fd); if (result.ok) { setFormMessage(result.message); router.refresh() } }} onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
               {editing && <input type="hidden" name="event_id" value={editing.id} />}
               <div className={`${styles.modalBody} min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4`}>
               <section className={styles.formSection}>

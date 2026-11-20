@@ -1,29 +1,11 @@
 import { resolveAgendaContext } from '@/lib/agenda-context'
 import { applyAgendaReadScope, isAgendaAdministrator, scopeAgendaEvents } from '@/lib/agenda-security'
 import { hasAgendaSchema } from '@/lib/agenda-schema'
+import { AGENDA_EVENT_SELECT_COLUMNS, agendaDateKey, agendaPeriodBounds } from '@/lib/agenda-calendar-data'
 import Link from 'next/link'
 import AgendaCalendar from './agenda-calendar'
 
-const zone = 'America/Sao_Paulo'
-const key = (d: Date) => {
-  const p = new Intl.DateTimeFormat('en-CA', {
-    timeZone: zone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(d)
-  return `${p.find((x) => x.type === 'year')?.value}-${p.find((x) => x.type === 'month')?.value}-${p.find((x) => x.type === 'day')?.value}`
-}
-const nowMonth = () => key(new Date()).slice(0, 7)
-const add = (d: Date, n: number) => new Date(d.getTime() + n * 86400000)
-const calendarDays = (month: string) => {
-  const [year, mon] = month.split('-').map(Number)
-  const first = new Date(Date.UTC(year, mon - 1, 1, 12))
-  const last = new Date(Date.UTC(year, mon, 0, 12))
-  const offset = first.getUTCDay()
-  const total = Math.ceil((offset + last.getUTCDate()) / 7) * 7
-  return Array.from({ length: total }, (_, i) => key(add(first, i - offset)))
-}
+const key = agendaDateKey
 
 type Params = { month?: string; view?: string; day?: string; notice?: string; action_error?: string; saved?: string; new?: string }
 type AgendaMetrics = { total: number | null; scheduled: number | null; completed: number | null; cancelled: number | null }
@@ -40,17 +22,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
   const view = sp.view && ['month', 'week', 'day'].includes(sp.view) ? (sp.view as 'month' | 'week' | 'day') : 'month'
   const selectedDay = sp.day && /^\d{4}-\d{2}-\d{2}$/.test(sp.day) ? sp.day : todayStr
   const month = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : selectedDay.slice(0, 7)
-  const days = calendarDays(month)
-  const weekStart = (() => {
-    const d = new Date(`${selectedDay}T12:00:00-03:00`)
-    d.setUTCDate(d.getUTCDate() - d.getUTCDay())
-    return key(d)
-  })()
-  const weekEnd = key(add(new Date(`${weekStart}T12:00:00-03:00`), 6))
-  const rangeStart = view === 'day' ? selectedDay : view === 'week' ? weekStart : days[0]
-  const rangeEnd = view === 'day' ? selectedDay : view === 'week' ? weekEnd : days[days.length - 1]
-  const from = new Date(`${rangeStart}T00:00:00-03:00`).toISOString()
-  const to = new Date(`${rangeEnd}T23:59:59.999-03:00`).toISOString()
+  const { days, from, to } = agendaPeriodBounds(view, month, selectedDay)
 
   let events: any[] = []
   let contacts: any[] = []
@@ -71,9 +43,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
     const [eventsResult, contactsResult, servicesResult, membersResult, totalMetric, scheduledMetric, completedMetric, cancelledMetric] = await Promise.all([
       applyAgendaReadScope(supabase
         .from('agenda_events')
-        .select(
-          'id,title,description,event_type,starts_at,ends_at,all_day,contact_id,contact_name_manual,contact_phone_manual,service_id,service_name_manual,service_description_manual,assigned_user_id,status,color'
-        ), actor)
+        .select(AGENDA_EVENT_SELECT_COLUMNS), actor)
         .gte('starts_at', from)
         .lte('starts_at', to)
         .order('starts_at'),
