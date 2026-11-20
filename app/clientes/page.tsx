@@ -4,11 +4,11 @@ import { safeSearchTerm } from '@/lib/crm-validation'
 import { PageHeader, Panel, table, th, td } from '@/components/ui'
 import { resolveTenantContext } from '@/lib/tenant/context'
 import { applyCustomerListFilters, customerPageHref, getCustomerPagination, getCustomerProductScope, parseCustomerPage } from '@/lib/customer-pagination'
+import { resolveCustomerProductOptions, type CustomerProductCatalogItem } from '@/lib/customer-products'
 
 type SearchParamValue = string | string[] | undefined
 type SearchParams = Promise<{ q?: SearchParamValue; status?: SearchParamValue; product?: SearchParamValue; page?: SearchParamValue; notice?: SearchParamValue; customer?: SearchParamValue }>
 type Person = { id: string; kind: string; name: string; trade_name: string | null; tax_id: string | null; email: string | null; phone: string | null; mobile_phone: string | null; whatsapp: string | null }
-type ProductOption = { id: string; name: string; active: boolean }
 type CustomerRow = { id: string; person_id: string; status: string; since: string; people: Person | Person[] | null }
 const firstSearchParam = (value: SearchParamValue) => Array.isArray(value) ? value[0] ?? '' : value ?? ''
 const phoneForWhatsApp = (value: string) => {
@@ -23,14 +23,14 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
   const params = await searchParams
   const queryText = firstSearchParam(params.q)
   const statusParam = firstSearchParam(params.status)
-  const requestedProductId = firstSearchParam(params.product)
+  const requestedProductCode = firstSearchParam(params.product)
   const noticeParam = firstSearchParam(params.notice)
   const customerParam = firstSearchParam(params.customer)
   const term = safeSearchTerm(queryText)
   const status = ['active', 'inactive'].includes(statusParam) ? statusParam : 'all'
   const supabase = await createAdminClient()
   const { companyId } = await resolveTenantContext(supabase)
-  const products: ProductOption[] = []
+  const products: CustomerProductCatalogItem[] = []
   let productError: { message: string } | null = null
   for (let from = 0; ; from += 1000) {
     const result = await supabase.from('products')
@@ -39,13 +39,16 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
       productError = result.error
       break
     }
-    const rows = (result.data ?? []) as ProductOption[]
+    const rows = (result.data ?? []) as CustomerProductCatalogItem[]
     products.push(...rows)
     if (rows.length < 1000) break
   }
-  const selectedProduct = products.find(product => product.id === requestedProductId)
+  const productOptions = resolveCustomerProductOptions(products, true)
+  const selectedOption = productOptions.find(option => option.code === requestedProductCode)
+  const selectedProduct = selectedOption?.product
   const productId = selectedProduct?.id ?? ''
-  const invalidProduct = Boolean(requestedProductId && !selectedProduct)
+  const productCode = selectedProduct?.id ? selectedOption?.code ?? '' : ''
+  const invalidProduct = Boolean(requestedProductCode && !selectedProduct)
   const productScope = getCustomerProductScope(companyId, productId)
 
   const searchFilter = term
@@ -105,10 +108,10 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-ink sm:col-span-1 lg:col-span-1">
             Produto contratado
-            <select name="product" defaultValue={requestedProductId} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-blue focus:ring-2 focus:ring-blue/15">
+            <select name="product" defaultValue={requestedProductCode} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink outline-none focus:border-blue focus:ring-2 focus:ring-blue/15">
               <option value="">Todos os produtos</option>
-              {invalidProduct && <option value={requestedProductId} disabled>Produto indisponível</option>}
-              {products.map(product => <option key={product.id} value={product.id}>{product.name}{product.active ? '' : ' (inativo)'}</option>)}
+              {productOptions.map(option => <option key={option.code} value={option.code} disabled={!option.product}>{option.label}{option.product ? '' : ' (indisponível)'}</option>)}
+              {invalidProduct && !selectedOption && <option value={requestedProductCode} disabled>Produto indisponível</option>}
             </select>
           </label>
           <button className="self-end btn-base btn-primary btn-md">Pesquisar</button>
@@ -160,11 +163,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
         {!customerError && totalCount > 0 && (
           <nav aria-label="Paginação de clientes" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 p-4 text-sm">
             {pagination.page > 1 ? (
-              <Link href={customerPageHref(pagination.page - 1, { term, status, productId })} className="btn-base btn-secondary btn-sm">Anterior</Link>
+              <Link href={customerPageHref(pagination.page - 1, { term, status, productCode })} className="btn-base btn-secondary btn-sm">Anterior</Link>
             ) : <span aria-disabled="true" className="btn-base btn-secondary btn-sm opacity-50">Anterior</span>}
             <span className="text-center text-muted">Página {pagination.page} de {pagination.totalPages} · {pagination.firstRecord}–{pagination.lastRecord} de {totalCount}</span>
             {pagination.page < pagination.totalPages ? (
-              <Link href={customerPageHref(pagination.page + 1, { term, status, productId })} className="btn-base btn-secondary btn-sm">Próxima</Link>
+              <Link href={customerPageHref(pagination.page + 1, { term, status, productCode })} className="btn-base btn-secondary btn-sm">Próxima</Link>
             ) : <span aria-disabled="true" className="btn-base btn-secondary btn-sm opacity-50">Próxima</span>}
           </nav>
         )}

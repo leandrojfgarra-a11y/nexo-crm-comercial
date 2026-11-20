@@ -17,16 +17,19 @@ export function normalizeCustomerProduct(value: string) {
 
 export type CustomerProductCatalogItem = { id: string; name: string; internal_code?: string | null; active: boolean }
 
-export function matchCustomerProduct(optionCode: string, products: CustomerProductCatalogItem[]) {
+export function matchCustomerProduct(optionCode: string, products: CustomerProductCatalogItem[], includeInactive = false) {
   const option = CUSTOMER_PRODUCT_OPTIONS.find(item => item.code === optionCode)
   if (!option) return undefined
   const headerNames: readonly string[] = option.names
-  const activeProducts = products.filter(product => product.active)
-  const codeMatches = activeProducts.filter(product => headerNames.includes(normalizeCustomerProduct(product.internal_code ?? '')))
+  const catalogProducts = includeInactive ? products : products.filter(product => product.active)
+  const codeMatches = catalogProducts.filter(product => headerNames.includes(normalizeCustomerProduct(product.internal_code ?? '')))
   if (codeMatches.length === 1) return codeMatches[0]
-  if (codeMatches.length > 1) return undefined
+  if (codeMatches.length > 1) {
+    const canonicalNameMatches = codeMatches.filter(product => headerNames.includes(normalizeCustomerProduct(product.name)))
+    return canonicalNameMatches.length === 1 ? canonicalNameMatches[0] : undefined
+  }
 
-  const nameMatches = activeProducts.filter(product => {
+  const nameMatches = catalogProducts.filter(product => {
     const name = normalizeCustomerProduct(product.name)
     return headerNames.includes(name)
       || (optionCode === 'LIMITADOR NOTA' && /^LIMITADORDENOTAS?$/.test(name))
@@ -35,9 +38,16 @@ export function matchCustomerProduct(optionCode: string, products: CustomerProdu
   if (nameMatches.length > 1) return undefined
 
   const aliases: readonly string[] = option.names
-  const partial = activeProducts.filter(product => {
+  const partial = catalogProducts.filter(product => {
     const name = normalizeCustomerProduct(product.name)
     return aliases.some(alias => alias.length >= 4 && name.includes(alias))
   })
   return partial.length === 1 ? partial[0] : undefined
+}
+
+export function resolveCustomerProductOptions(products: CustomerProductCatalogItem[], includeInactive = false) {
+  return CUSTOMER_PRODUCT_OPTIONS.map(option => ({
+    ...option,
+    product: matchCustomerProduct(option.code, products, includeInactive),
+  }))
 }

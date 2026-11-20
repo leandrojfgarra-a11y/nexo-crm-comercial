@@ -94,7 +94,7 @@ test('aplica os mesmos filtros combinados à contagem e à página', () => {
 
 test('mantém pesquisa, situação e produto ao trocar de página', () => {
   assert.equal(
-    customerPageHref(3, { term: 'Loja & Cia', status: 'active', productId: 'produto/42' }),
-    '/clientes?q=Loja+%26+Cia&status=active&product=produto%2F42&page=3',
+    customerPageHref(3, { term: 'Loja & Cia', status: 'active', productCode: 'APP' }),
+    '/clientes?q=Loja+%26+Cia&status=active&product=APP&page=3',
   )
 })

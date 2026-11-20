@@ -39,11 +39,11 @@ export function applyCustomerListFilters<Query>(query: Query, filters: CustomerL
   return applyCustomerProductFilter(filteredQuery, filters.productScope) as unknown as Query
 }
 
-export function customerPageHref(page: number, filters: { term: string; status: string; productId: string }) {
+export function customerPageHref(page: number, filters: { term: string; status: string; productCode: string }) {
   const params = new URLSearchParams()
   if (filters.term) params.set('q', filters.term)
   if (filters.status !== 'all') params.set('status', filters.status)
-  if (filters.productId) params.set('product', filters.productId)
+  if (filters.productCode) params.set('product', filters.productCode)
   params.set('page', String(page))
   return `/clientes?${params.toString()}`
 }
