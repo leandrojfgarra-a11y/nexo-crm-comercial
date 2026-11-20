@@ -1,5 +1,14 @@
 export const CUSTOMER_PAGE_SIZE = 25
 
+export async function collectPagedRows<T>(fetchPage: (from: number, to: number) => Promise<T[]>, pageSize = 500) {
+  const rows: T[] = []
+  for (let from = 0; ; from += pageSize) {
+    const page = await fetchPage(from, from + pageSize - 1)
+    rows.push(...page)
+    if (page.length < pageSize) return rows
+  }
+}
+
 export type CustomerProductScope = {
   companyId: string
   productId: string

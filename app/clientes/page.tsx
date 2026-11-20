@@ -5,6 +5,7 @@ import { PageHeader, Panel, table, th, td } from '@/components/ui'
 import { resolveTenantContext } from '@/lib/tenant/context'
 import { applyCustomerListFilters, customerPageHref, getCustomerPagination, getCustomerProductScope, parseCustomerPage } from '@/lib/customer-pagination'
 import { resolveCustomerProductOptions, type CustomerProductCatalogItem } from '@/lib/customer-products'
+import { CustomerExportToolbar, CustomerSelectionProvider, SelectCustomerRow } from '@/components/customer-selection'
 
 type SearchParamValue = string | string[] | undefined
 type SearchParams = Promise<{ q?: SearchParamValue; status?: SearchParamValue; product?: SearchParamValue; page?: SearchParamValue; notice?: SearchParamValue; customer?: SearchParamValue }>
@@ -34,7 +35,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
   let productError: { message: string } | null = null
   for (let from = 0; ; from += 1000) {
     const result = await supabase.from('products')
-      .select('id,name,active').eq('company_id', companyId).order('name').range(from, from + 999)
+      .select('id,name,internal_code,active').eq('company_id', companyId).order('id').range(from, from + 999)
     if (result.error) {
       productError = result.error
       break
@@ -86,13 +87,17 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
   }
   const notice = noticeParam ? noticeText[noticeParam] ?? noticeParam : null
   const noticeIsSuccess = ['customer-created', 'customer-updated', 'customer-created-schema-pending', 'customer-updated-schema-pending', 'lead-converted'].includes(noticeParam)
+  const exportFilters = { searchTerm: term, status: status as 'all' | 'active' | 'inactive', productCode: productCode || null }
+  const visibleCustomerIds = customers.map(customer => customer.id)
 
   return (
+    <CustomerSelectionProvider companyId={companyId} filters={exportFilters}>
     <div>
       <PageHeader eyebrow="Relacionamento" title="Clientes" subtitle="Pesquise e acompanhe os cadastros comerciais de pessoas físicas e jurídicas." action="Novo cliente" href="/clientes/novo" />
       <div className="-mt-3 mb-5 flex justify-end"><Link href="/clientes/importar" className="btn-base btn-secondary btn-sm">Importar clientes históricos</Link></div>
       {notice && <p role={noticeIsSuccess ? 'status' : 'alert'} className={`msg-base mt-4 ${noticeIsSuccess ? 'msg-success' : 'msg-danger'}`}>{notice}{customerParam && <Link className="ml-2 font-semibold underline" href={`/clientes/${customerParam}`}>Abrir ficha 360°</Link>}</p>}
       <Panel title="Clientes cadastrados" aside={countError ? 'Total indisponível' : `${totalCount} registros`}>
+        <CustomerExportToolbar filters={exportFilters} totalCount={totalCount} visibleCustomerIds={visibleCustomerIds} />
         <form method="get" className="grid gap-3 border-b border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-5">
           <label className="flex flex-col gap-1 text-sm font-medium text-ink sm:col-span-2 lg:col-span-2">
             Nome, CPF/CNPJ, telefone ou WhatsApp
@@ -135,6 +140,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
                   return (
                     <tr key={customer.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
                       <td className={`${td} font-semibold`}>
+                        <SelectCustomerRow customerId={customer.id} customerName={person.trade_name || person.name} />
                         <Link href={`/clientes/${customer.id}`} className="font-semibold text-blue hover:underline">{person.name}</Link>
                         {person.trade_name && <span className="block text-xs font-normal text-muted">{person.trade_name}</span>}
                       </td>
@@ -173,5 +179,6 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
         )}
       </Panel>
     </div>
+    </CustomerSelectionProvider>
   )
 }
