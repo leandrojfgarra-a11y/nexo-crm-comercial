@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { PageHeader, Panel, table, th, td } from '@/components/ui'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveTenantContext, TenantContextError } from '@/lib/tenant/context'
+import { loadPeopleByIds } from '@/lib/people-lookup'
 
 type SearchParams = Promise<{ q?: string; status?: string }>
 const statuses: Record<string, string> = { draft: 'Rascunho', sent: 'Enviado', awaiting_signature: 'Aguardando assinatura', signed: 'Assinado', active: 'Vigente', closed: 'Encerrado', cancelled: 'Cancelado' }
@@ -23,7 +24,7 @@ export default async function ContractsPage({ searchParams }: { searchParams: Se
   ])
   const customerRows = customersResult.data ?? []
   const peopleIds = [...new Set(customerRows.map(row => row.person_id))]
-  const peopleResult = peopleIds.length ? await supabase.from('people').select('id,name,trade_name,tax_id').eq('company_id', tenant.companyId).in('id', peopleIds) : { data: [], error: null }
+  const peopleResult = peopleIds.length ? await loadPeopleByIds(supabase, tenant.companyId, peopleIds, 'id,name,trade_name,tax_id') : { data: [], error: null }
   const people = new Map((peopleResult.data ?? []).map(row => [row.id, row]))
   const customers = new Map(customerRows.map(row => {
     const person = people.get(row.person_id)

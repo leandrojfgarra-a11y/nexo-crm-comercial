@@ -6,6 +6,7 @@ import { hasOpportunityCommercialProfileSchema, hasSalesFunnelSchema, SALES_FUNN
 import { hasBusinessActivitySchema, hasCompleteAccountantSchema, hasCompleteCustomerSchema } from '@/lib/customer-schema'
 import { hasProductCatalogSchema } from '@/lib/product-catalog'
 import { resolveTenantContext } from '@/lib/tenant/context'
+import { loadPeopleByIds } from '@/lib/people-lookup'
 
 type SearchParams = Promise<{ q?: string; seller?: string; notice?: string }>
 
@@ -62,7 +63,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Searc
         ...opportunityRows.map(row => row.person_id).filter(Boolean),
       ])] as string[]
       const { data: people, error: peopleError } = personIds.length
-        ? await supabase.from('people').select(['id,name,trade_name,email,phone,mobile_phone,whatsapp,tax_id,address_line,address_number,address_extra,district,city,state,postal_code',customerSchemaReady ? 'state_registration,municipal_registration,tax_regime' : '',businessActivityReady ? 'business_activity' : ''].filter(Boolean).join(',')).eq('company_id', companyId).in('id', personIds)
+        ? await loadPeopleByIds(supabase, companyId, personIds, ['id,name,trade_name,email,phone,mobile_phone,whatsapp,tax_id,address_line,address_number,address_extra,district,city,state,postal_code',customerSchemaReady ? 'state_registration,municipal_registration,tax_regime' : '',businessActivityReady ? 'business_activity' : ''].filter(Boolean).join(','))
         : { data: [], error: null }
       const opportunityIds = opportunityRows.map(row => row.id)
       const { data: eventRows, error: eventError } = opportunityIds.length
