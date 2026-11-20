@@ -1,5 +1,53 @@
 export const CUSTOMER_PAGE_SIZE = 25
 
+export type CustomerProductScope = {
+  companyId: string
+  productId: string
+}
+
+/** Reusable tenant-scoped product filter for customer-rooted PostgREST queries. */
+export function getCustomerProductScope(companyId: string, productId: string): CustomerProductScope | null {
+  return productId ? { companyId, productId } : null
+}
+
+type CustomerFilterQuery = {
+  eq: (column: string, value: string) => CustomerFilterQuery
+  or: (filters: string, options: { referencedTable: string }) => CustomerFilterQuery
+}
+
+export function applyCustomerProductFilter<Query>(query: Query, scope: CustomerProductScope | null): Query {
+  if (!scope) return query
+  const filterableQuery = query as unknown as CustomerFilterQuery
+  return filterableQuery
+    .eq('customer_products.company_id', scope.companyId)
+    .eq('customer_products.product_id', scope.productId) as unknown as Query
+}
+
+export type CustomerListFilters = {
+  companyId: string
+  status: string
+  searchFilter: string | null
+  productScope: CustomerProductScope | null
+}
+
+/** Apply identical tenant and user filters to count, page, and future report queries. */
+export function applyCustomerListFilters<Query>(query: Query, filters: CustomerListFilters): Query {
+  const filterableQuery = query as unknown as CustomerFilterQuery
+  let filteredQuery = filterableQuery.eq('company_id', filters.companyId)
+  if (filters.status !== 'all') filteredQuery = filteredQuery.eq('status', filters.status)
+  if (filters.searchFilter) filteredQuery = filteredQuery.or(filters.searchFilter, { referencedTable: 'people' })
+  return applyCustomerProductFilter(filteredQuery, filters.productScope) as unknown as Query
+}
+
+export function customerPageHref(page: number, filters: { term: string; status: string; productId: string }) {
+  const params = new URLSearchParams()
+  if (filters.term) params.set('q', filters.term)
+  if (filters.status !== 'all') params.set('status', filters.status)
+  if (filters.productId) params.set('product', filters.productId)
+  params.set('page', String(page))
+  return `/clientes?${params.toString()}`
+}
+
 export function parseCustomerPage(value?: string | string[]) {
   const raw = Array.isArray(value) ? value[0] : value
   if (!raw || !/^\d+$/.test(raw)) return 1
