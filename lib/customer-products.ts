@@ -1,6 +1,6 @@
 export const CUSTOMER_PRODUCT_OPTIONS = [
   { code: 'CT-E', label: 'CT-E', headers: ['CTE'], names: ['CTE'] },
-  { code: 'APP', label: 'APP', headers: ['APP'], names: ['APP'] },
+  { code: 'APP', label: 'APP PEDIDOS', headers: ['APP', 'APPPEDIDOS'], names: ['APPPEDIDOS', 'APP'] },
   { code: 'NFP-E', label: 'NFP-E', headers: ['NFPE', 'NFP'], names: ['NFPE', 'NFP'] },
   { code: 'BOLETO', label: 'BOLETO', headers: ['BOLETO'], names: ['BOLETO'] },
   { code: 'NFSE', label: 'NFSE', headers: ['NFSE'], names: ['NFSE'] },
@@ -25,7 +25,8 @@ export function matchCustomerProduct(optionCode: string, products: CustomerProdu
   const codeMatches = catalogProducts.filter(product => headerNames.includes(normalizeCustomerProduct(product.internal_code ?? '')))
   if (codeMatches.length === 1) return codeMatches[0]
   if (codeMatches.length > 1) {
-    const canonicalNameMatches = codeMatches.filter(product => headerNames.includes(normalizeCustomerProduct(product.name)))
+    const canonicalName = normalizeCustomerProduct(option.label)
+    const canonicalNameMatches = codeMatches.filter(product => normalizeCustomerProduct(product.name) === canonicalName)
     return canonicalNameMatches.length === 1 ? canonicalNameMatches[0] : undefined
   }
 

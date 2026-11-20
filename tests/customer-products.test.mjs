@@ -4,7 +4,7 @@ import { CUSTOMER_PRODUCT_OPTIONS, matchCustomerProduct, normalizeCustomerProduc
 
 test('mantém os dez produtos contratados esperados e normaliza seus cabeçalhos', () => {
   assert.deepEqual(CUSTOMER_PRODUCT_OPTIONS.map(item => item.label), [
-    'CT-E', 'APP', 'NFP-E', 'BOLETO', 'NFSE', 'MDF-E', 'BACKUP', 'LIMITADOR NOTA', 'GARRAX', 'NFCE',
+    'CT-E', 'APP PEDIDOS', 'NFP-E', 'BOLETO', 'NFSE', 'MDF-E', 'BACKUP', 'LIMITADOR NOTA', 'GARRAX', 'NFCE',
   ])
   assert.equal(normalizeCustomerProduct('Limitador de Notas'), 'LIMITADORDENOTAS')
 })
@@ -19,7 +19,7 @@ test('associa cada código ao produto único existente no catálogo', () => {
 
 test('prioriza o código APP exato sobre uma coincidência de nome', () => {
   const catalog = [
-    { id: 'app-canonico', name: 'Aplicativo Garra', internal_code: 'APP', active: true },
+    { id: 'app-canonico', name: 'APP PEDIDOS', internal_code: 'APP', active: true },
     { id: 'app-nome', name: 'APP', internal_code: 'OUTRO', active: true },
   ]
   assert.equal(matchCustomerProduct('APP', catalog)?.id, 'app-canonico')
@@ -28,10 +28,18 @@ test('prioriza o código APP exato sobre uma coincidência de nome', () => {
 test('desempata códigos internos duplicados usando un único nome canônico', () => {
   const catalog = [
     { id: 'app-codigo', name: 'Aplicativo Garra', internal_code: 'APP', active: true },
-    { id: 'app-canonico', name: 'APP', internal_code: 'APP', active: true },
+    { id: 'app-canonico', name: 'APP PEDIDOS', internal_code: 'APP', active: true },
   ]
   assert.equal(matchCustomerProduct('APP', catalog)?.id, 'app-canonico')
   assert.equal(matchCustomerProduct('APP', catalog.map(item => ({ ...item, name: 'Aplicativo' }))), undefined)
+})
+
+test('mantém a coluna histórica APP e associa o internal_code APP ao rótulo APP PEDIDOS', () => {
+  const option = CUSTOMER_PRODUCT_OPTIONS.find(item => item.code === 'APP')
+  assert.equal(option?.label, 'APP PEDIDOS')
+  assert.equal(option?.headers.includes('APP'), true)
+  const catalog = [{ id: 'app-pedidos', name: 'APP PEDIDOS', internal_code: 'APP', active: true }]
+  assert.equal(matchCustomerProduct('APP', catalog)?.id, 'app-pedidos')
 })
 
 test('usa o nome APP quando não há código correspondente e ignora produtos inativos', () => {
