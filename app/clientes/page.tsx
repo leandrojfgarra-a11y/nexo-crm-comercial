@@ -5,7 +5,7 @@ import { PageHeader, Panel, table, th, td } from '@/components/ui'
 import { resolveTenantContext } from '@/lib/tenant/context'
 import { applyCustomerListFilters, customerPageHref, getCustomerPagination, getCustomerProductScope, parseCustomerPage } from '@/lib/customer-pagination'
 import { resolveCustomerProductOptions, type CustomerProductCatalogItem } from '@/lib/customer-products'
-import { CustomerExportToolbar, CustomerSelectionProvider, SelectCustomerRow } from '@/components/customer-selection'
+import { CustomerExportToolbar, CustomerSelectionProvider, SelectAllCustomersOnPage, SelectCustomerRow } from '@/components/customer-selection'
 
 type SearchParamValue = string | string[] | undefined
 type SearchParams = Promise<{ q?: SearchParamValue; status?: SearchParamValue; product?: SearchParamValue; page?: SearchParamValue; notice?: SearchParamValue; customer?: SearchParamValue }>
@@ -97,7 +97,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
       <div className="-mt-3 mb-5 flex justify-end"><Link href="/clientes/importar" className="btn-base btn-secondary btn-sm">Importar clientes históricos</Link></div>
       {notice && <p role={noticeIsSuccess ? 'status' : 'alert'} className={`msg-base mt-4 ${noticeIsSuccess ? 'msg-success' : 'msg-danger'}`}>{notice}{customerParam && <Link className="ml-2 font-semibold underline" href={`/clientes/${customerParam}`}>Abrir ficha 360°</Link>}</p>}
       <Panel title="Clientes cadastrados" aside={countError ? 'Total indisponível' : `${totalCount} registros`}>
-        <CustomerExportToolbar filters={exportFilters} totalCount={totalCount} visibleCustomerIds={visibleCustomerIds} />
+        <CustomerExportToolbar filters={exportFilters} totalCount={totalCount} />
         <form method="get" className="grid gap-3 border-b border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-5">
           <label className="flex flex-col gap-1 text-sm font-medium text-ink sm:col-span-2 lg:col-span-2">
             Nome, CPF/CNPJ, telefone ou WhatsApp
@@ -129,7 +129,15 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
           <div className="overflow-x-auto">
             <table className={`${table} w-full min-w-[900px]`}>
               <thead>
-                <tr>{['Cliente', 'Tipo', 'CPF/CNPJ', 'Contato', 'Situação', 'Ações'].map(col => <th key={col} className={th}>{col}</th>)}</tr>
+                <tr>
+                  <th className={th}>
+                    <div className="flex items-center gap-2">
+                      <SelectAllCustomersOnPage customerIds={visibleCustomerIds} />
+                      <span>Cliente</span>
+                    </div>
+                  </th>
+                  {['Tipo', 'CPF/CNPJ', 'Contato', 'Situação', 'Ações'].map(col => <th key={col} className={th}>{col}</th>)}
+                </tr>
               </thead>
               <tbody>
                 {customers.map(customer => {

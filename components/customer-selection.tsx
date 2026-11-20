@@ -82,7 +82,7 @@ export function SelectAllCustomersOnPage({ customerIds }: { customerIds: string[
     checked={allSelected}
     disabled={!ready || !customerIds.length}
     onChange={event => setPage(customerIds, event.target.checked)}
-    className="accent-blue"
+    className="h-4 w-4 shrink-0 accent-blue"
   />
 }
 
@@ -94,11 +94,11 @@ export function SelectCustomerRow({ customerId, customerName }: { customerId: st
     checked={selectedSet.has(customerId)}
     disabled={!ready}
     onChange={event => toggle(customerId, event.target.checked)}
-    className="mr-2 accent-blue"
+    className="mr-2 h-4 w-4 shrink-0 accent-blue"
   />
 }
 
-export function CustomerExportToolbar({ filters, totalCount, visibleCustomerIds }: { filters: ExportFilters; totalCount: number; visibleCustomerIds: string[] }) {
+export function CustomerExportToolbar({ filters, totalCount }: { filters: ExportFilters; totalCount: number }) {
   const { selectedIds, ready, clear } = useCustomerSelection()
   const [scope, setScope] = useState<ExportScope>('all')
   const [busy, setBusy] = useState<'xlsx' | 'pdf' | null>(null)
@@ -147,10 +147,6 @@ export function CustomerExportToolbar({ filters, totalCount, visibleCustomerIds 
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span aria-live="polite" className="font-medium text-ink">{ready ? selectedIds.length : 0} selecionados</span>
         <button type="button" onClick={clear} disabled={!ready || selectedIds.length === 0} className="font-semibold text-blue underline disabled:text-slate-400">Limpar seleção</button>
-        <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-          <SelectAllCustomersOnPage customerIds={visibleCustomerIds} />
-          <span>Selecionar todos desta página</span>
-        </label>
       </div>
     </div>
     <div className="flex flex-wrap gap-2">
