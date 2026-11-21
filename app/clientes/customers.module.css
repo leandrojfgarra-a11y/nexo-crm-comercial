@@ -1,3 +1,29 @@
+.mobileCustomerCards { display: grid; gap: .65rem; padding: 0 .75rem .75rem; }
+.mobileCustomerCard {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: .7rem;
+  background: var(--color-surface, #fff);
+  padding: .8rem;
+  color: var(--color-ink, #172334);
+}
+.mobileCustomerHeading { display: flex; min-width: 0; align-items: flex-start; gap: .55rem; }
+.mobileCustomerHeading > input { width: 1rem; height: 1rem; margin-top: .2rem; flex: 0 0 auto; }
+.mobileCustomerIdentity { min-width: 0; flex: 1 1 auto; }
+.mobileCustomerName, .mobileCustomerTradeName { display: block; overflow-wrap: anywhere; }
+.mobileCustomerName { color: #1769aa; font-size: .95rem; font-weight: 700; line-height: 1.25rem; }
+.mobileCustomerTradeName { margin-top: .12rem; color: var(--color-muted, #64748b); font-size: .75rem; line-height: 1rem; }
+.mobileCustomerStatus { flex: 0 0 auto; border-radius: 999px; padding: .2rem .5rem; font-size: .68rem; font-weight: 700; white-space: nowrap; }
+.mobileCustomerDetails { display: grid; min-width: 0; gap: .45rem; margin: .7rem 0 0; }
+.mobileCustomerDetails > div { display: grid; min-width: 0; grid-template-columns: 5rem minmax(0, 1fr); gap: .45rem; font-size: .75rem; line-height: 1.05rem; }
+.mobileCustomerDetails dt { color: var(--color-muted, #64748b); }
+.mobileCustomerDetails dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.mobileCustomerDetails a { color: inherit; text-decoration: underline; text-decoration-color: #38bdf8; text-underline-offset: 2px; }
+.mobileCustomerActions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .75rem; }
+.mobileCustomerActions :global(.btn-base) { min-height: 40px; }
+.desktopCustomerTable { display: none; }
+
 .customerList :global(.page-header) {
   margin-bottom: 1rem;
   gap: .75rem;
@@ -126,6 +152,11 @@
   .customerList :global(form[method="get"]) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 
+@media (min-width: 768px) {
+  .mobileCustomerCards { display: none; }
+  .desktopCustomerTable { display: block; }
+}
+
 :global(.dark-theme) .customerList :global(.filter-toolbar) { border-color: #475569; background: #14243b; color: #e2e8f0; }
 :global(.dark-theme) .customerList :global(.form-field input),
 :global(.dark-theme) .customerList :global(.form-field select) { border-color: #475569; background: #0f1d32; color: #f1f5f9; }
@@ -139,3 +170,7 @@
 :global(.dark-theme) .customerList :global(form[method="get"] input:focus-visible),
 :global(.dark-theme) .customerList :global(form[method="get"] select:focus-visible) { border-color: #38bdf8; box-shadow: 0 0 0 2px rgb(56 189 248 / .2); }
 :global(.dark-theme) .customerList :global(table tbody tr:hover) { background: rgb(30 41 59 / .45); }
+:global(.dark-theme) .mobileCustomerCard { border-color: #475569; background: #14243b; color: #e2e8f0; }
+:global(.dark-theme) .mobileCustomerName { color: #7dd3fc; }
+:global(.dark-theme) .mobileCustomerTradeName,
+:global(.dark-theme) .mobileCustomerDetails dt { color: #a8b6c8; }

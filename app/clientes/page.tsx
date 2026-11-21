@@ -127,6 +127,40 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
         ) : !customers.length ? (
           <p className="p-6 text-center text-sm text-muted">Nenhum cliente encontrado. Ajuste os filtros ou cadastre um novo cliente.</p>
         ) : (
+          <>
+          <div className={styles.mobileCustomerCards} aria-label="Clientes">
+            {customers.map(customer => {
+              const person = Array.isArray(customer.people) ? customer.people[0] : customer.people
+              if (!person) return null
+              const phone = phoneForWhatsApp(person.whatsapp || person.mobile_phone || person.phone || '')
+              const displayPhone = person.phone || person.mobile_phone || person.whatsapp
+              const whatsappHref = phone ? `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(`Olá, ${person.trade_name || person.name}! Aqui é da Garra Automação. Podemos conversar?`)}` : null
+              return (
+                <article key={customer.id} className={styles.mobileCustomerCard}>
+                  <div className={styles.mobileCustomerHeading}>
+                    <SelectCustomerRow customerId={customer.id} customerName={person.trade_name || person.name} />
+                    <div className={styles.mobileCustomerIdentity}>
+                      <Link href={`/clientes/${customer.id}`} className={styles.mobileCustomerName}>{person.name}</Link>
+                      {person.trade_name && <p className={styles.mobileCustomerTradeName}>{person.trade_name}</p>}
+                    </div>
+                    <span className={`${styles.mobileCustomerStatus} ${statusColors[customer.status] ?? statusColors.active}`}>{statusLabels[customer.status] ?? customer.status}</span>
+                  </div>
+                  <dl className={styles.mobileCustomerDetails}>
+                    <div><dt>CPF/CNPJ</dt><dd>{formatTaxId(person.tax_id) || '—'}</dd></div>
+                    <div><dt>Tipo</dt><dd>{person.kind === 'individual' ? 'Pessoa física' : 'Pessoa jurídica'}</dd></div>
+                    {displayPhone && <div><dt>Telefone</dt><dd><a href={`tel:${displayPhone.replace(/[^\d+]/g, '')}`}>{displayPhone}</a></dd></div>}
+                    {person.email && <div><dt>E-mail</dt><dd><a href={`mailto:${person.email}`}>{person.email}</a></dd></div>}
+                  </dl>
+                  <div className={styles.mobileCustomerActions}>
+                    <Link href={`/clientes/${customer.id}`} className="btn-base btn-secondary btn-sm">Ficha 360°</Link>
+                    <Link href={`/clientes/${customer.id}/editar`} className="btn-base btn-secondary btn-sm">Editar</Link>
+                    {whatsappHref && <a href={whatsappHref} target="_blank" rel="noopener noreferrer" data-nexo-whatsapp-link="true" className="btn-base btn-success btn-sm">WhatsApp</a>}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+          <div className={styles.desktopCustomerTable}>
           <div className="overflow-x-auto">
             <table className={`${table} w-full min-w-[900px]`}>
               <thead>
@@ -174,6 +208,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
               </tbody>
             </table>
           </div>
+          </div>
+          </>
         )}
         {!customerError && totalCount > 0 && (
           <nav aria-label="Paginação de clientes" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 p-4 text-sm">
