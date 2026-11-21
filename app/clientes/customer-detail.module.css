@@ -1,0 +1,89 @@
+.customerDetail { min-width: 0; }
+.customerDetail :global(.page-header) { margin-bottom: .9rem; gap: .75rem; }
+.customerDetail :global(.page-title) { font-size: 1.35rem; line-height: 1.8rem; }
+.customerDetail :global(.page-subtitle) { margin-top: .2rem; font-size: .8rem; line-height: 1.2rem; }
+.customerDetail > :global(a:first-child) { margin-bottom: .65rem; font-size: 12px; }
+.customerDetail :global(.crm-tab) { border-radius: 6px 6px 0 0; padding: .45rem .7rem; font-size: 12px; white-space: nowrap; }
+.customerDetail :global(.crm-tab-active) { box-shadow: inset 0 -2px 0 #2563eb; }
+.customerDetail :global(.card-base) {
+  display: flex;
+  min-height: 112px;
+  flex-direction: column;
+  border-radius: 9px;
+}
+.customerDetail :global(.card-base > p:nth-of-type(1)) { font-size: 12px; }
+.customerDetail :global(.card-base > p:nth-of-type(2)) { font-size: 22px; line-height: 1.75rem; }
+.customerDetail :global(.card-base > p:nth-of-type(3)) { margin-top: auto; font-size: 11px; line-height: 1rem; }
+.customerDetail :global(.card-base),
+.customerDetail :global(.panel-base) { min-width: 0; }
+.customerDetail :global(.panel-header) { padding: .7rem .9rem; }
+.customerDetail :global(.panel-header h2) { font-size: 13px; }
+
+.customerDocuments,
+.customerContracts { align-items: start; }
+.customerDocuments :global(.panel-base > div),
+.customerContracts :global(.panel-base > div) { min-width: 0; }
+.customerDocuments :global(label),
+.customerContracts :global(label) { gap: .3rem; font-size: 12px; }
+.customerDocuments :global(input:not([type="hidden"])),
+.customerDocuments :global(select),
+.customerContracts :global(input:not([type="hidden"])),
+.customerContracts :global(select) {
+  min-height: 35px;
+  padding: .35rem .6rem;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--color-ink, #172334);
+}
+.customerDocuments :global(input:not([type="hidden"])),
+.customerDocuments :global(select),
+.customerContracts :global(input:not([type="hidden"])),
+.customerContracts :global(select) { border: 1px solid #cbd5e1; background: var(--color-surface, #fff); }
+.customerDocuments :global(textarea),
+.customerContracts :global(textarea) {
+  min-height: 60px;
+  padding: .45rem .6rem;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--color-ink, #172334);
+  border: 1px solid #cbd5e1;
+  background: var(--color-surface, #fff);
+}
+.customerDocuments :global(input[type="file"]),
+.customerContracts :global(input[type="file"]) { min-height: 36px; padding: .3rem; font-size: 11.5px; }
+.customerDocuments :global(button),
+.customerContracts :global(button) { min-height: 33px; padding: 0 11px; border-radius: 7px; font-size: 12px; font-weight: 600; }
+.customerDocuments :global(button:focus-visible),
+.customerContracts :global(button:focus-visible) { outline: 2px solid #38bdf8; outline-offset: 2px; }
+.customerDocuments :global(input:focus-visible),
+.customerDocuments :global(select:focus-visible),
+.customerDocuments :global(textarea:focus-visible),
+.customerContracts :global(input:focus-visible),
+.customerContracts :global(select:focus-visible),
+.customerContracts :global(textarea:focus-visible) { border-color: #2878d0; outline: 2px solid rgb(40 120 208 / .2); outline-offset: 1px; }
+.customerDocuments :global(article),
+.customerContracts :global(article) { padding: .9rem; }
+.customerDocuments :global(article p),
+.customerContracts :global(article p) { overflow-wrap: anywhere; }
+.customerDocuments :global(article form),
+.customerContracts :global(article form) { min-width: 0; }
+
+:global(.dark-theme) .customerDetail :global(.crm-tab) { color: #cbd5e1; }
+:global(.dark-theme) .customerDetail :global(.crm-tab-active) { color: #7dd3fc; box-shadow: inset 0 -2px 0 #38bdf8; }
+:global(.dark-theme) .customerDocuments :global(input:not([type="hidden"])),
+:global(.dark-theme) .customerDocuments :global(select),
+:global(.dark-theme) .customerDocuments :global(textarea),
+:global(.dark-theme) .customerContracts :global(input:not([type="hidden"])),
+:global(.dark-theme) .customerContracts :global(select),
+:global(.dark-theme) .customerContracts :global(textarea) { border-color: #475569; background: #0f1d32; color: #f1f5f9; }
+:global(.dark-theme) .customerDocuments :global(input[type="file"]::file-selector-button),
+:global(.dark-theme) .customerContracts :global(input[type="file"]::file-selector-button) { border-color: #475569; background: #1e293b; color: #e2e8f0; }
+
+@media (max-width: 767px) {
+  .customerDetail :global(.page-header) { align-items: flex-start; }
+  .customerDetail :global(.page-header > div:last-child) { width: 100%; }
+  .customerDocuments,
+  .customerContracts { grid-template-columns: minmax(0, 1fr); }
+  .customerDocuments :global(article > div:first-child),
+  .customerContracts :global(article > div:first-child) { align-items: flex-start; }
+}

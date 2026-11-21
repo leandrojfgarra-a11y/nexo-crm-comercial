@@ -6,6 +6,7 @@ import { resolveTenantContext } from '@/lib/tenant/context'
 import { applyCustomerListFilters, customerPageHref, getCustomerPagination, getCustomerProductScope, parseCustomerPage } from '@/lib/customer-pagination'
 import { resolveCustomerProductOptions, type CustomerProductCatalogItem } from '@/lib/customer-products'
 import { CustomerExportToolbar, CustomerSelectionProvider, SelectAllCustomersOnPage, SelectCustomerRow } from '@/components/customer-selection'
+import styles from './customers.module.css'
 
 type SearchParamValue = string | string[] | undefined
 type SearchParams = Promise<{ q?: SearchParamValue; status?: SearchParamValue; product?: SearchParamValue; page?: SearchParamValue; notice?: SearchParamValue; customer?: SearchParamValue }>
@@ -92,7 +93,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
 
   return (
     <CustomerSelectionProvider companyId={companyId} filters={exportFilters}>
-    <div>
+    <div className={styles.customerList}>
       <PageHeader eyebrow="Relacionamento" title="Clientes" subtitle="Pesquise e acompanhe os cadastros comerciais de pessoas físicas e jurídicas." action="Novo cliente" href="/clientes/novo" />
       <div className="-mt-3 mb-5 flex justify-end"><Link href="/clientes/importar" className="btn-base btn-secondary btn-sm">Importar clientes históricos</Link></div>
       {notice && <p role={noticeIsSuccess ? 'status' : 'alert'} className={`msg-base mt-4 ${noticeIsSuccess ? 'msg-success' : 'msg-danger'}`}>{notice}{customerParam && <Link className="ml-2 font-semibold underline" href={`/clientes/${customerParam}`}>Abrir ficha 360°</Link>}</p>}
@@ -153,7 +154,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
                         {person.trade_name && <span className="block text-xs font-normal text-muted">{person.trade_name}</span>}
                       </td>
                       <td className={td}>{person.kind === 'individual' ? 'Pessoa física' : 'Pessoa jurídica'}</td>
-                      <td className={td}>{person.tax_id ?? '—'}</td>
+                      <td className={`${td} font-mono text-xs`}>{formatTaxId(person.tax_id) || '—'}</td>
                       <td className={td}>{[person.phone, person.whatsapp, person.email].filter(Boolean).join(' · ') || '—'}</td>
                       <td className={td}>
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusColors[customer.status] ?? statusColors.active}`}>{customer.status === 'active' ? 'Ativo' : 'Inativo'}</span>
@@ -189,4 +190,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
     </div>
     </CustomerSelectionProvider>
   )
+}
+
+function formatTaxId(value: string | null | undefined) {
+  const digits = (value ?? '').replace(/\D/g, '')
+  if (digits.length === 11) return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+  if (digits.length === 14) return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
+  return value ?? ''
 }
