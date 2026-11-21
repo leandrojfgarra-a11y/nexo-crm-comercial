@@ -36,6 +36,10 @@ test('keeps mobile navigation labelled, scrollable and closable', () => {
   assert.match(shell, /overflow-y-auto/)
   assert.match(shell, /event\.key === 'Escape'/)
   assert.match(shell, /aria-label="Fechar menu"/)
+  assert.match(shell, /mobileNavCloseRef\.current.*\.focus\(\)/)
+  assert.match(shell, /onKeyDown=\{handleMobileMenuKeyDown\}/)
+  assert.match(shell, /closeMobileMenu\('navigation'\)/)
+  assert.match(shell, /mobileNavTriggerRef\.current\?\.focus\(\)/)
 })
 
 test('keeps topbar theme colors inside its CSS Module', () => {
